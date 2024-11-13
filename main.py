@@ -19,31 +19,44 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
         # Inicjalizacja interfejsu użytkownika
         self.setWindowTitle("YouTubeText - Pobieranie transkrypcji z YouTube")
         self.setGeometry(100, 100, 900, 600)
+        self.setStyleSheet(self.load_stylesheet())
 
         # Wprowadzanie klucza API
         self.api_key_label = QtWidgets.QLabel("Klucz API YouTube Data v3:", self)
+        self.api_key_label.setStyleSheet('font-weight: bold; font-size: 20px; color: #555555;')
         self.api_key_input = QtWidgets.QLineEdit(self)
-        self.api_key_input.setFixedWidth(400)
+        self.api_key_input.setFixedHeight(50)
         self.save_api_key_button = QtWidgets.QPushButton("Zapisz", self)
+        self.save_api_key_button.setFixedHeight(50)
+        self.save_api_key_button.setFixedWidth(100)
         self.save_api_key_button.clicked.connect(self.save_api_key)
 
         # Wprowadzanie URL kanału
         self.channel_url_label = QtWidgets.QLabel("URL kanału YouTube:", self)
+        self.channel_url_label.setStyleSheet('font-weight: bold; font-size: 20px; color: #555555;')
         self.channel_url_input = QtWidgets.QLineEdit(self)
-        self.channel_url_input.setFixedWidth(400)
-        self.fetch_channel_button = QtWidgets.QPushButton("Pobierz ID Kanału", self)
+        self.channel_url_input.setFixedHeight(50)
+        self.fetch_channel_button = QtWidgets.QPushButton("Wczytaj", self)
+        self.fetch_channel_button.setFixedHeight(50)
+        self.fetch_channel_button.setFixedWidth(100)
         self.fetch_channel_button.clicked.connect(self.fetch_channel_id)
         self.channel_id_label = QtWidgets.QLabel("", self)
+        self.channel_id_label.setStyleSheet('font-size: 18px; color: #777777;')
 
         # Wybór katalogu do zapisu transkrypcji
         self.output_dir_label = QtWidgets.QLabel("Katalog do zapisu transkrypcji:", self)
+        self.output_dir_label.setStyleSheet('font-weight: bold; font-size: 20px; color: #555555;')
         self.output_dir_input = QtWidgets.QLineEdit(self)
+        self.output_dir_input.setFixedHeight(50)
         self.output_dir_input.setText("transcriptions")
         self.output_dir_button = QtWidgets.QPushButton("Wybierz", self)
+        self.output_dir_button.setFixedHeight(50)
+        self.output_dir_button.setFixedWidth(100)
         self.output_dir_button.clicked.connect(self.select_output_directory)
 
         # Tekst statusu
         self.status_label = QtWidgets.QLabel("", self)
+        self.status_label.setStyleSheet('font-size: 18px;')
 
         # Widok listy wideo
         self.video_list_text = QtWidgets.QTextEdit(self)
@@ -52,29 +65,75 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
 
         # Przyciski do pobierania filmów i transkrypcji
         self.fetch_videos_button = QtWidgets.QPushButton("Pobierz listę filmów", self)
+        self.fetch_videos_button.setFixedWidth(200)
+        self.fetch_videos_button.setFixedHeight(50)
         self.fetch_videos_button.clicked.connect(self.fetch_videos)
         self.download_all_button = QtWidgets.QPushButton("Pobierz wszystkie dostępne transkrypcje", self)
+        self.download_all_button.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+
+        self.download_all_button.setFixedHeight(50)
         self.download_all_button.clicked.connect(self.download_all_transcriptions)
 
         # Layout
-        layout = QtWidgets.QVBoxLayout()
-        form_layout = QtWidgets.QFormLayout()
+        form_layout = QtWidgets.QGridLayout()
 
-        form_layout.addRow(self.api_key_label, self.api_key_input)
-        form_layout.addWidget(self.save_api_key_button)
-        form_layout.addRow(self.channel_url_label, self.channel_url_input)
-        form_layout.addWidget(self.fetch_channel_button)
-        form_layout.addWidget(self.channel_id_label)
-        form_layout.addRow(self.output_dir_label, self.output_dir_input)
-        form_layout.addWidget(self.output_dir_button)
+        form_layout.addWidget(self.api_key_label, 0, 0)
+        form_layout.addWidget(self.api_key_input, 0, 1)
+        form_layout.addWidget(self.save_api_key_button, 0, 2)
 
-        layout.addLayout(form_layout)
-        layout.addWidget(self.fetch_videos_button)
-        layout.addWidget(self.video_list_text)
-        layout.addWidget(self.download_all_button)
-        layout.addWidget(self.status_label)
+        form_layout.addWidget(self.channel_url_label, 1, 0)
+        form_layout.addWidget(self.channel_url_input, 1, 1)
+        form_layout.addWidget(self.fetch_channel_button, 1, 2)
+        form_layout.addWidget(self.channel_id_label, 2, 1, 1, 2)
 
-        self.setLayout(layout)
+        form_layout.addWidget(self.output_dir_label, 3, 0)
+        form_layout.addWidget(self.output_dir_input, 3, 1)
+        form_layout.addWidget(self.output_dir_button, 3, 2)
+
+        form_layout.addWidget(self.fetch_videos_button, 4, 0, 1, 3)
+        form_layout.addWidget(self.video_list_text, 5, 0, 1, 3)
+        form_layout.addWidget(self.download_all_button, 6, 0, 1, 3)
+        form_layout.addWidget(self.status_label, 7, 0, 1, 3)
+
+        self.setLayout(form_layout)
+
+    def load_stylesheet(self):
+        return """
+            QWidget {
+                background-color: #f0f0f0;
+                color: #000000;
+                font-family: 'Segoe UI', sans-serif; font-size: 20px;
+            }
+            QPushButton {
+                background-color: #ffffff;
+                border: 1px solid #d0d0d0;
+                color: #000000;
+                padding: 10px;
+                font-size: 20px;
+                border-radius: 5px;
+            }
+            QPushButton:hover {
+                background-color: #e0e0e0;
+            }
+            QLineEdit {
+                background-color: #ffffff;
+                border: 1px solid #d0d0d0;
+                padding: 5px;
+                font-size: 20px;
+                border-radius: 5px;
+            }
+            QTextEdit {
+                background-color: #ffffff;
+                border: 1px solid #d0d0d0;
+                padding: 5px;
+                font-size: 20px;
+                border-radius: 5px;
+            }
+            QLabel {
+                color: #000000;
+                font-size: 20px;
+            }
+        """
 
     def save_api_key(self):
         # Zapisz klucz API
@@ -129,7 +188,8 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
     def select_output_directory(self):
         # Wybierz katalog do zapisu transkrypcji
         options = QtWidgets.QFileDialog.Options()
-        directory = QtWidgets.QFileDialog.getExistingDirectory(self, "Wybierz katalog do zapisu transkrypcji", "", options)
+        directory = QtWidgets.QFileDialog.getExistingDirectory(self, "Wybierz katalog do zapisu transkrypcji", "",
+                                                               options)
         if directory:
             self.output_dir_input.setText(directory)
             self.status_label.setText(f"Wybrano katalog: {directory}")
