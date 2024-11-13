@@ -92,14 +92,12 @@ def get_channel_video_ids_and_titles(youtube_client, channel_id, status_text, vi
     for video_id, title, publish_date in video_data:
         # Aktualizuj listę filmów na bieżąco
         video_item = ft.Row(
-            controls=[
-                ft.Text(f"{title} ({publish_date})"),
-                ft.Text(f"Transkrypcja: Nieznana"),
-                ft.ElevatedButton(text="Pobierz",
-                                  on_click=create_download_handler(video_id))
-            ]
-        )
-        video_list_view.controls.append(video_item)
+    controls=[
+        ft.Text(f"{publish_date} - {title} - Transkrypcja: Nieznana", size=12),
+        ft.IconButton(icon=ft.icons.DOWNLOAD, on_click=create_download_handler(video_id))
+    ]
+)
+        video_list_view.controls.append(ft.Container(content=video_item, padding=ft.padding.symmetric(vertical=1)))
     video_list_view.update()
 
     status_text.value = "Pobieranie zakończone."
