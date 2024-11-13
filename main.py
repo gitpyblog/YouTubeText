@@ -67,9 +67,13 @@ def get_channel_video_ids_and_titles(youtube_client, channel_id, status_text, vi
         type="video"
     )
 
+    status_text.value = "Pobieranie listy wideo..."
+    status_text.update()
+    video_list_view.controls.clear()
+    video_list_view.controls.append(ft.Text("Pobrana lista filmów", size=16, weight=ft.FontWeight.BOLD))
+    video_list_view.update()
+
     while request:
-        status_text.value = "Pobieranie listy wideo..."
-        status_text.update()
         response = request.execute()
         for item in response.get("items", []):
             video_id = item["id"].get("videoId")
@@ -77,20 +81,26 @@ def get_channel_video_ids_and_titles(youtube_client, channel_id, status_text, vi
                 title = item["snippet"]["title"]
                 publish_date = item["snippet"]["publishedAt"][:10]  # Wyodrębnij tylko część daty (YYYY-MM-DD)
                 video_data.append((video_id, title, publish_date))
-                # Aktualizuj listę filmów na bieżąco
-                video_item = ft.Row(
-                    controls=[
-                        ft.Text(f"{title} ({publish_date})"),
-                        ft.Text(f"Transkrypcja: Nieznana"),
-                        ft.ElevatedButton(text="Pobierz",
-                                          on_click=lambda _e, v_id=video_id: on_download_transcription_click(v_id,
-                                                                                                             output_dir_input,
-                                                                                                             status_text))
-                    ]
-                )
-                video_list_view.controls.append(video_item)
-                video_list_view.update()
+
         request = youtube_client.search().list_next(request, response)
+
+    # Sortuj filmy od najnowszych do najstarszych (najstarsze na końcu)
+    video_data.sort(key=lambda x: x[2], reverse=False)
+    video_list_view.controls.clear()
+    for video_id, title, publish_date in video_data:
+        # Aktualizuj listę filmów na bieżąco
+        video_item = ft.Row(
+            controls=[
+                ft.Text(f"{title} ({publish_date})"),
+                ft.Text(f"Transkrypcja: Nieznana"),
+                ft.ElevatedButton(text="Pobierz",
+                                  on_click=lambda _e, v_id=video_id: on_download_transcription_click(v_id,
+                                                                                                     output_dir_input,
+                                                                                                     status_text))
+            ]
+        )
+        video_list_view.controls.append(video_item)
+    video_list_view.update()
 
     status_text.value = "Pobieranie zakończone."
     status_text.update()
@@ -155,6 +165,9 @@ def on_download_transcription_click(video_id, output_dir_input, status_text):
 def main(page: ft.Page):
     page.title = "YouTubeText - Pobieranie transkrypcji z YouTube"
     page.vertical_alignment = ft.MainAxisAlignment.START
+    page.theme_mode = ft.ThemeMode.LIGHT
+    page.window.width = 900
+    page.window.height = 900
 
     api_key_input = ft.TextField(label="Klucz API YouTube Data v3", width=400)
     save_api_key_button = ft.ElevatedButton(text="Zapisz", on_click=lambda _e: on_save_api_key_click())
@@ -162,9 +175,15 @@ def main(page: ft.Page):
     fetch_channel_id_button = ft.ElevatedButton(text="Pobierz ID Kanału",
                                                 on_click=lambda _e: on_fetch_channel_id_click())
     channel_id_text = ft.Text(value="", width=400)
-    channel_details_text = ft.Text(value="", width=600)
-    video_list_view = ft.ListView(expand=True, height=400)
+    channel_details_text = ft.Row(
+        controls=[
+            ft.Text(value="", width=600),
+            ft.Container(width=100, height=100)  # Placeholder for avatar image
+        ]
+    )
+    video_list_view = ft.Column(scroll=ft.ScrollMode.AUTO, expand=True)
     output_dir_input = ft.TextField(label="Katalog do zapisu transkrypcji", value="transcriptions", width=400)
+    output_dir_button = ft.ElevatedButton(text="Wybierz", on_click=lambda _e: on_select_output_dir_click())
     status_text = ft.Text(value="", width=600)
 
     youtube_client = None
@@ -200,13 +219,13 @@ def main(page: ft.Page):
             channel_id_text.value = f"ID Kanału: {channel_id}"
             channel_id_text.update()
             title, subscriber_count, video_count, avatar_url = get_channel_details(youtube_client, channel_id)
-            channel_details_text.value = f"Kanał: {title}, Subskrybenci: {subscriber_count}, Filmy: {video_count}"
-            channel_details_text.update()
+            channel_details_text.controls[0].value = f"Kanał: {title}, Subskrybenci: {subscriber_count}, Filmy: {video_count}"
             if avatar_url:
                 avatar_image = ft.Image(src=avatar_url, width=100, height=100)
-                page.add(avatar_image)
+                channel_details_text.controls[1] = avatar_image
             else:
-                status_text.value = "Brak dostępnego avatara kanału."
+                channel_details_text.controls[1] = ft.Text(value="Brak dostępnego avatara kanału.")
+            channel_details_text.update()
             status_text.value = "Zapisano ID kanału."
         except ValueError as e:
             status_text.value = str(e)
@@ -244,21 +263,28 @@ def main(page: ft.Page):
                 status_text.value = f"Transkrypcja niedostępna dla wideo: {title}"
                 status_text.update()
 
+    def on_select_output_dir_click():
+        # Wybierz ścieżkę do zapisu transkrypcji
+        new_output_dir = ft.get_directory_path()
+        if new_output_dir:
+            output_dir_input.value = new_output_dir
+            output_dir_input.update()
+            status_text.value = f"Zaktualizowano katalog do zapisu transkrypcji: {new_output_dir}"
+            status_text.update()
+
     fetch_videos_button = ft.ElevatedButton(text="Pobierz listę filmów", on_click=on_fetch_videos_click)
     download_all_button = ft.ElevatedButton(text="Pobierz wszystkie dostępne transkrypcje",
                                             on_click=on_download_all_click)
 
     page.add(
-        api_key_input,
-        save_api_key_button,
-        channel_url_input,
-        fetch_channel_id_button,
+        ft.Row([api_key_input, save_api_key_button]),
+        ft.Row([channel_url_input, fetch_channel_id_button]),
         channel_id_text,
         channel_details_text,
         fetch_videos_button,
-        video_list_view,
+        ft.Container(content=ft.Column(controls=[video_list_view], scroll=ft.ScrollMode.AUTO), expand=True, width="90%", height=500, border=ft.border.all(1), padding=15),
+        ft.Row([output_dir_input, output_dir_button]),
         download_all_button,
-        output_dir_input,
         status_text
     )
 
