@@ -2,6 +2,7 @@ import os
 import re
 import sys
 import threading
+import json
 from PyQt5 import QtWidgets, QtGui, QtCore
 from googleapiclient.discovery import build
 from youtube_transcript_api import YouTubeTranscriptApi
@@ -12,7 +13,10 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
         super().__init__()
         self.youtube_client = None
         self.channel_id = None
+        self.channel_title = ""
+        self.subscribers = "0"
         self.video_data = []
+        self.transcriptions = {}  # Store transcriptions in memory
         self.init_ui()
 
     def init_ui(self):
@@ -39,7 +43,7 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
         self.fetch_channel_button = QtWidgets.QPushButton("Wczytaj", self)
         self.fetch_channel_button.setFixedHeight(50)
         self.fetch_channel_button.setFixedWidth(100)
-        self.fetch_channel_button.clicked.connect(self.fetch_channel_id)
+        self.fetch_channel_button.clicked.connect(self.fetch_channel_info)
         self.channel_id_label = QtWidgets.QLabel("", self)
         self.channel_id_label.setStyleSheet('font-size: 18px; color: #777777;')
 
@@ -70,9 +74,21 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
         self.fetch_videos_button.clicked.connect(self.fetch_videos)
         self.download_all_button = QtWidgets.QPushButton("Pobierz wszystkie dostępne transkrypcje", self)
         self.download_all_button.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
-
         self.download_all_button.setFixedHeight(50)
         self.download_all_button.clicked.connect(self.download_all_transcriptions)
+
+        # Dodaj przyciski do eksportu do plików TXT i JSON
+        self.export_txt_button = QtWidgets.QPushButton("Zrzuć transkrypcje do plików .txt", self)
+        self.export_txt_button.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        self.export_txt_button.setFixedHeight(50)
+        self.export_txt_button.setEnabled(False)
+        self.export_txt_button.clicked.connect(self.export_to_txt)
+
+        self.export_json_button = QtWidgets.QPushButton("Zrzuć transkrypcje do pliku .json", self)
+        self.export_json_button.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        self.export_json_button.setFixedHeight(50)
+        self.export_json_button.setEnabled(False)
+        self.export_json_button.clicked.connect(self.export_to_json)
 
         # Layout
         form_layout = QtWidgets.QGridLayout()
@@ -93,7 +109,9 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
         form_layout.addWidget(self.fetch_videos_button, 4, 0, 1, 3)
         form_layout.addWidget(self.video_list_text, 5, 0, 1, 3)
         form_layout.addWidget(self.download_all_button, 6, 0, 1, 3)
-        form_layout.addWidget(self.status_label, 7, 0, 1, 3)
+        form_layout.addWidget(self.export_txt_button, 7, 0, 1, 3)
+        form_layout.addWidget(self.export_json_button, 8, 0, 1, 3)
+        form_layout.addWidget(self.status_label, 9, 0, 1, 3)
 
         self.setLayout(form_layout)
 
@@ -114,6 +132,10 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
             }
             QPushButton:hover {
                 background-color: #e0e0e0;
+            }
+            QPushButton:disabled {
+                background-color: #dcdcdc;
+                color: #aaaaaa;
             }
             QLineEdit {
                 background-color: #ffffff;
@@ -145,7 +167,7 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
             except Exception as e:
                 self.status_label.setText(f"🔐 Błąd klucza API: {e}")
 
-    def fetch_channel_id(self):
+    def fetch_channel_info(self):
         # Pobierz ID kanału YouTube na podstawie URL
         if not self.youtube_client:
             self.status_label.setText("🔐 Klucz API nie został zapisany.")
@@ -154,11 +176,29 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
         channel_url = self.channel_url_input.text()
         try:
             self.channel_id = self.get_channel_id_from_url(channel_url)
-            self.channel_id_label.setText(f"ID Kanału: {self.channel_id}")
+            self.fetch_channel_statistics()
+            self.channel_id_label.setText(f"ID Kanału: {self.channel_id}, Subskrybenci: {self.subscribers}")
         except ValueError as e:
             self.status_label.setText(str(e))
         except Exception as e:
             self.status_label.setText(f"Błąd: {e}")
+
+    def fetch_channel_statistics(self):
+        # Pobierz statystyki kanału, w tym liczbę subskrybentów
+        if not self.youtube_client or not self.channel_id:
+            return
+        try:
+            request = self.youtube_client.channels().list(
+                part="snippet,statistics",
+                id=self.channel_id
+            )
+            response = request.execute()
+            if "items" in response and len(response["items"]) > 0:
+                channel_info = response["items"][0]
+                self.channel_title = channel_info["snippet"]["title"]
+                self.subscribers = channel_info["statistics"].get("subscriberCount", "N/A")
+        except Exception as e:
+            self.status_label.setText(f"Błąd pobierania statystyk kanału: {e}")
 
     def get_channel_id_from_url(self, channel_url):
         # Metoda do wyodrębnienia ID kanału z URL
@@ -214,11 +254,12 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
             video_id = item["id"].get("videoId")
             if video_id:
                 title = item["snippet"]["title"]
-                self.video_data.append((video_id, title))
+                publish_date = item["snippet"]["publishedAt"]  # Pobierz datę publikacji
+                self.video_data.append((video_id, title, publish_date))
 
         self.video_list_text.clear()
-        for video_id, title in self.video_data:
-            self.video_list_text.append(f"{title} (ID: {video_id})")
+        for video_id, title, publish_date in self.video_data:
+            self.video_list_text.append(f"{title} (ID: {video_id}, Data: {publish_date})")
 
         self.status_label.setText("Pobieranie zakończone.")
 
@@ -229,10 +270,14 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
             self.status_label.setText("Wybierz katalog do zapisu transkrypcji.")
             return
 
-        for video_id, title in self.video_data:
+        for video_id, title, publish_date in self.video_data:
             self.status_label.setText(f"Pobieranie transkrypcji dla wideo: {title}")
             QtCore.QCoreApplication.processEvents()
             threading.Thread(target=self.download_transcription, args=(video_id, title, output_dir)).start()
+
+        # Aktywuj przyciski eksportu po pobraniu transkrypcji
+        self.export_txt_button.setEnabled(True)
+        self.export_json_button.setEnabled(True)
 
     def download_transcription(self, video_id, title, output_dir):
         # Pobierz transkrypcję dla pojedynczego wideo
@@ -245,9 +290,105 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
             output_path = os.path.join(output_dir, output_filename)
             with open(output_path, "w", encoding="utf-8") as file:
                 file.write(transcript_text)
+            self.transcriptions[video_id] = transcript_text  # Store transcription in memory
             self.status_label.setText(f"Transkrypcja zapisana: {output_filename}")
         except Exception as e:
             self.status_label.setText(f"Błąd pobierania transkrypcji: {e}")
+
+    def export_to_txt(self):
+        # Eksportuj transkrypcje do pojedynczych plików TXT
+        output_dir = self.output_dir_input.text()
+        if not output_dir:
+            self.status_label.setText("Wybierz katalog do zapisu plików TXT.")
+            return
+
+        for video_id, title, publish_date in self.video_data:
+            transcript = self.transcriptions.get(video_id)
+            if transcript:
+                sanitized_title = re.sub(r'[/*?"<>|:]', "", title)
+                output_filename = f"{sanitized_title}.txt"
+                output_path = os.path.join(output_dir, output_filename)
+                with open(output_path, "w", encoding="utf-8") as file:
+                    file.write(transcript)
+        self.status_label.setText(f"Transkrypcje zapisane w plikach TXT w katalogu: {output_dir}")
+
+    def export_to_json(self):
+        # Eksportuj transkrypcje do pliku JSON
+        output_dir = self.output_dir_input.text()
+        if not output_dir:
+            self.status_label.setText("Wybierz katalog do zapisu pliku JSON.")
+            return
+
+        channel_data = {
+            "channel_id": self.channel_id,
+            "channel_title": self.channel_title,
+            "channel_url": f"https://www.youtube.com/channel/{self.channel_id}",
+            "subscribers": self.subscribers,
+            "total_videos": len(self.video_data),
+            "videos": []
+        }
+
+        for video_id, title, publish_date in self.video_data:
+            transcript = self.transcriptions.get(video_id)
+            if not transcript:
+                # Jeśli transkrypcja nie była jeszcze pobrana, pobierz ją teraz
+                self.status_label.setText(f"Pobieranie transkrypcji dla wideo: {title}")
+                QtCore.QCoreApplication.processEvents()
+                transcript = self.download_transcription_synchronously(video_id)
+            duration = self.get_video_duration(video_id)  # Pobierz długość filmu
+            channel_data["videos"].append({
+                "video_id": video_id,
+                "title": title,
+                "publish_date": publish_date,
+                "duration": duration,
+                "transcript": transcript
+            })
+
+        output_path = os.path.join(output_dir, "channel_transcriptions.json")
+        with open(output_path, "w", encoding="utf-8") as json_file:
+            json.dump(channel_data, json_file, indent=4, ensure_ascii=False)
+
+        self.status_label.setText(f"Transkrypcje zapisane w pliku: {output_path}")
+
+    def download_transcription_synchronously(self, video_id):
+        # Pobierz transkrypcję dla pojedynczego wideo w trybie synchronicznym
+        try:
+            transcripts = YouTubeTranscriptApi.list_transcripts(video_id)
+            transcript = transcripts.find_transcript(['pl'])
+            transcript_text = "\n".join([entry["text"] for entry in transcript.fetch()])
+            self.transcriptions[video_id] = transcript_text  # Store transcription in memory
+            return transcript_text
+        except Exception as e:
+            self.status_label.setText(f"Błąd pobierania transkrypcji: {e}")
+            return ""
+
+    def get_video_duration(self, video_id):
+        # Pobierz długość filmu na podstawie jego ID
+        try:
+            request = self.youtube_client.videos().list(
+                part="contentDetails",
+                id=video_id
+            )
+            response = request.execute()
+            if "items" in response and len(response["items"]) > 0:
+                duration = response["items"][0]["contentDetails"]["duration"]
+                return self.parse_duration(duration)
+        except Exception as e:
+            return "00:00"
+
+    def parse_duration(self, duration):
+        # Parsuj czas trwania w formacie ISO 8601 do formatu czytelnego dla człowieka (HH:MM:SS)
+        hours = minutes = seconds = 0
+        duration = duration.replace("PT", "")
+        if "H" in duration:
+            hours = int(duration.split("H")[0])
+            duration = duration.split("H")[1]
+        if "M" in duration:
+            minutes = int(duration.split("M")[0])
+            duration = duration.split("M")[1]
+        if "S" in duration:
+            seconds = int(duration.split("S")[0])
+        return f"{hours:02}:{minutes:02}:{seconds:02}"
 
 
 if __name__ == "__main__":
