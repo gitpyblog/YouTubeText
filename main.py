@@ -8,6 +8,7 @@ import aiohttp
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
+
 # Ustaw klienta API YouTube
 def get_youtube_client(api_key):
     return googleapiclient.discovery.build("youtube", "v3", developerKey=api_key)
@@ -81,24 +82,17 @@ def get_channel_video_ids_and_titles(youtube_client, channel_id, status_text, vi
             video_id = item["id"].get("videoId")
             if video_id:
                 title = item["snippet"]["title"]
-                publish_date = item["snippet"]["publishedAt"][:10]  # Wyodrębnij tylko część daty (YYYY-MM-DD)
-                video_data.append((video_id, title, publish_date))
+                publish_date = item["snippet"]["publishedAt"][0:10]  # Wyodrębnij tylko część daty (YYYY-MM-DD)
+                thumbnail_url = item["snippet"]["thumbnails"]["default"]["url"]
+                video_data.append((video_id, title, publish_date, thumbnail_url))
 
         request = youtube_client.search().list_next(request, response)
 
     # Sortuj filmy od najnowszych do najstarszych (najstarsze na końcu)
     video_data.sort(key=lambda x: x[2], reverse=False)
-    video_list_view.controls.clear()
-    for video_id, title, publish_date in video_data:
-        # Aktualizuj listę filmów na bieżąco
-        video_item = ft.Row(
-    controls=[
-        ft.Text(f"{publish_date} - {title} - Transkrypcja: Nieznana", size=12),
-        ft.IconButton(icon=ft.icons.DOWNLOAD, on_click=create_download_handler(video_id))
-    ]
-)
-        video_list_view.controls.append(ft.Container(content=video_item, padding=ft.padding.symmetric(vertical=1)))
-    video_list_view.update()
+
+    # Redesign listy filmów
+    redesign_video_list(video_data, video_list_view)
 
     status_text.value = "Pobieranie zakończone."
     status_text.update()
@@ -137,7 +131,8 @@ def get_video_transcription(video_id):
 
 # Funkcja pomocnicza do utworzenia handlera dla pobierania transkrypcji
 def create_download_handler(video_id):
-    return lambda _e: threading.Thread(target=on_download_transcription_click, args=(video_id, output_dir_input, status_text)).start()
+    return lambda _e: threading.Thread(target=on_download_transcription_click,
+                                       args=(video_id, output_dir_input, status_text)).start()
 
 
 # Funkcja pobierania transkrypcji
@@ -222,7 +217,8 @@ def main(page: ft.Page):
             channel_id_text.value = f"ID Kanału: {channel_id}"
             channel_id_text.update()
             title, subscriber_count, video_count, avatar_url = get_channel_details(youtube_client, channel_id)
-            channel_details_text.controls[0].value = f"Kanał: {title}, Subskrybenci: {subscriber_count}, Filmy: {video_count}"
+            channel_details_text.controls[
+                0].value = f"Kanał: {title}, Subskrybenci: {subscriber_count}, Filmy: {video_count}"
             if avatar_url:
                 avatar_image = ft.Image(src=avatar_url, width=100, height=100)
                 channel_details_text.controls[1] = avatar_image
@@ -245,10 +241,11 @@ def main(page: ft.Page):
 
     def on_download_all_click(_e):
         output_dir = output_dir_input.value
-        for video_id, title, _ in video_data:
+        for video_id, title, _, _ in video_data:
             status_text.value = f"Pobieranie transkrypcji dla wideo: {title}"
             status_text.update()
-            threading.Thread(target=on_download_transcription_click, args=(video_id, output_dir_input, status_text)).start()
+            threading.Thread(target=on_download_transcription_click,
+                             args=(video_id, output_dir_input, status_text)).start()
 
     def on_select_output_dir_click():
         # Wybierz ścieżkę do zapisu transkrypcji
@@ -269,11 +266,62 @@ def main(page: ft.Page):
         channel_id_text,
         channel_details_text,
         fetch_videos_button,
-        ft.Container(content=ft.Column(controls=[video_list_view], scroll=ft.ScrollMode.AUTO), expand=True, width="90%", height=500, border=ft.border.all(1), padding=15),
+        ft.Container(content=ft.Column(controls=[video_list_view], scroll=ft.ScrollMode.AUTO), expand=True, width="90%",
+                     height=500, border=ft.border.all(1), padding=15),
         ft.Row([output_dir_input, output_dir_button]),
         download_all_button,
         status_text
     )
+
+
+def redesign_video_list(video_data, video_list_view):
+    video_list_view.controls.clear()
+    video_list_view.controls.append(
+        ft.Text("Pobrana lista filmów", size=16, weight=ft.FontWeight.BOLD)
+    )
+
+    for video_id, title, publish_date, thumbnail_url in video_data:
+        # Nowy układ elementu wideo
+        video_item = ft.Container(
+            content=ft.Row(
+                controls=[
+                    ft.Image(src=thumbnail_url, width=100, height=100),
+                    ft.Column(
+                        controls=[
+                            ft.Row(
+                                controls=[
+                                    ft.Text(f"Data publikacji:", weight=ft.FontWeight.BOLD, size=12),
+                                    ft.Text(publish_date, size=12),
+                                ],
+                                alignment=ft.MainAxisAlignment.START,
+                            ),
+                            ft.Text(f"Tytuł: {title}", weight=ft.FontWeight.BOLD, size=14),
+                            ft.Row(
+                                controls=[
+                                    ft.Text("Transkrypcja: Nieznana", size=12),
+                                    ft.IconButton(
+                                        icon=ft.icons.DOWNLOAD,
+                                        on_click=create_download_handler(video_id),
+                                        tooltip="Pobierz transkrypcję"
+                                    )
+                                ],
+                                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                            )
+                        ],
+                        spacing=5,
+                    )
+                ],
+                spacing=10,
+            ),
+            padding=ft.padding.symmetric(vertical=10, horizontal=10),
+            border=ft.border.all(1, color=ft.colors.GREY),
+            border_radius=ft.border_radius.all(10),
+            margin=ft.margin.symmetric(vertical=5),
+            bgcolor=ft.colors.WHITE,
+        )
+        video_list_view.controls.append(video_item)
+
+    video_list_view.update()
 
 
 ft.app(target=main)
