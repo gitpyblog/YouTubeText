@@ -4,7 +4,9 @@ import googleapiclient.discovery
 from youtube_transcript_api import YouTubeTranscriptApi
 import flet as ft
 import asyncio
-
+import aiohttp
+import threading
+from concurrent.futures import ThreadPoolExecutor
 
 # Ustaw klienta API YouTube
 def get_youtube_client(api_key):
@@ -94,9 +96,7 @@ def get_channel_video_ids_and_titles(youtube_client, channel_id, status_text, vi
                 ft.Text(f"{title} ({publish_date})"),
                 ft.Text(f"Transkrypcja: Nieznana"),
                 ft.ElevatedButton(text="Pobierz",
-                                  on_click=lambda _e, v_id=video_id: on_download_transcription_click(v_id,
-                                                                                                     output_dir_input,
-                                                                                                     status_text))
+                                  on_click=create_download_handler(video_id))
             ]
         )
         video_list_view.controls.append(video_item)
@@ -135,6 +135,11 @@ def get_video_transcription(video_id):
     except Exception as e:
         print(f"Nie udało się pobrać transkrypcji dla wideo {video_id}: {e}")
         return None, False
+
+
+# Funkcja pomocnicza do utworzenia handlera dla pobierania transkrypcji
+def create_download_handler(video_id):
+    return lambda _e: threading.Thread(target=on_download_transcription_click, args=(video_id, output_dir_input, status_text)).start()
 
 
 # Funkcja pobierania transkrypcji
@@ -200,17 +205,17 @@ def main(page: ft.Page):
             youtube_client = get_youtube_client(api_key)
             # Sprawdzenie poprawności klucza
             youtube_client.channels().list(part="id", id="UC_x5XG1OV2P6uZZ5FSM9Ttw").execute()
-            status_text.value = "Zapisano klucz API."
+            status_text.value = "🔑 Zapisano klucz API."
             api_key_input.disabled = True
         except Exception as e:
             api_key_input.disabled = False
-            status_text.value = f"Błąd klucza API: {e}"
+            status_text.value = f"🔐 Błąd klucza API: {e}"
         status_text.update()
 
     def on_fetch_channel_id_click():
         nonlocal channel_id
         if youtube_client is None:
-            status_text.value = "Klucz API nie został zapisany."
+            status_text.value = "🔐 Klucz API nie został zapisany."
             status_text.update()
             return
         channel_url = channel_url_input.value
@@ -245,23 +250,7 @@ def main(page: ft.Page):
         for video_id, title, _ in video_data:
             status_text.value = f"Pobieranie transkrypcji dla wideo: {title}"
             status_text.update()
-            transcription, is_auto_generated = get_video_transcription(video_id)
-            if transcription:
-                sanitized_title = re.sub(r'[/*?"<>|:]', "", title)
-                auto_tag = " [auto]" if is_auto_generated else ""
-                output_filename = f"{sanitized_title}{auto_tag}.txt"
-                output_path = os.path.join(output_dir, output_filename)
-                try:
-                    with open(output_path, "w", encoding="utf-8") as file:
-                        file.write(transcription)
-                    status_text.value = f"Transkrypcja zapisana: {output_filename}"
-                    status_text.update()
-                except OSError as e:
-                    status_text.value = f"Błąd zapisu transkrypcji: {e}"
-                    status_text.update()
-            else:
-                status_text.value = f"Transkrypcja niedostępna dla wideo: {title}"
-                status_text.update()
+            threading.Thread(target=on_download_transcription_click, args=(video_id, output_dir_input, status_text)).start()
 
     def on_select_output_dir_click():
         # Wybierz ścieżkę do zapisu transkrypcji
@@ -289,4 +278,4 @@ def main(page: ft.Page):
     )
 
 
-asyncio.run(ft.app_async(target=main))
+ft.app(target=main)
