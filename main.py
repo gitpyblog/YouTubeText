@@ -7,6 +7,7 @@ import sqlite3
 from PyQt5 import QtWidgets, QtGui, QtCore
 from googleapiclient.discovery import build
 from youtube_transcript_api import YouTubeTranscriptApi
+from youtube_transcript_api._errors import TranscriptsDisabled, NoTranscriptFound
 
 
 class YouTubeTranscriptApp(QtWidgets.QWidget):
@@ -305,6 +306,10 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
             ''', (transcript_text, video_id))
             self.conn.commit()
             self.status_label.setText(f"Transkrypcja zapisana: {output_filename}")
+        except TranscriptsDisabled:
+            self.status_label.setText(f"Błąd: Nie udało się pobrać transkrypcji. Możliwe, że napisy są wyłączone dla tego filmu.")
+        except NoTranscriptFound:
+            self.status_label.setText(f"Błąd: Nie znaleziono transkrypcji dla tego filmu.")
         except Exception as e:
             self.status_label.setText(f"Błąd pobierania transkrypcji: {e}")
 
