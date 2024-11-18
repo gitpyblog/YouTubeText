@@ -316,7 +316,8 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
                     title = item["snippet"]["title"]
                     publish_date = item["snippet"]["publishedAt"]
                     publish_date_formatted = datetime.strptime(publish_date, "%Y-%m-%dT%H:%M:%SZ").strftime("%d-%m-%Y %H:%M")
-                    self.video_data.append((video_id, title, publish_date_formatted))
+                    transcript_available = "Tak" if self.is_transcript_available(video_id) else "Nie"
+                    self.video_data.append((video_id, title, publish_date_formatted, transcript_available))
 
             # Sprawdź, czy jest następna strona wyników
             page_token = response.get("nextPageToken")
@@ -324,12 +325,20 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
                 break
 
         self.video_list_widget.clear()
-        for video_id, title, publish_date in self.video_data:
+        for video_id, title, publish_date, transcript_available in self.video_data:
             duration = self.get_video_duration(video_id)
-            list_item = QtWidgets.QListWidgetItem(f"{publish_date} - {title} ({duration})")
+            list_item = QtWidgets.QListWidgetItem(f"{publish_date} - {title} ({duration}) - Transkrypcja: {transcript_available}")
             self.video_list_widget.addItem(list_item)
 
         self.status_label.setText("Pobieranie zakończone.")
+
+    def is_transcript_available(self, video_id):
+        # Sprawdź, czy transkrypcja jest dostępna dla wideo
+        try:
+            YouTubeTranscriptApi.get_transcript(video_id, languages=['pl'])
+            return True
+        except (TranscriptsDisabled, NoTranscriptFound):
+            return False
 
     def export_to_txt(self):
         # Eksportuj transkrypcje do pojedynczych plików TXT
@@ -339,7 +348,7 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
             self.status_label.setStyleSheet('color: #dc3545; font-weight: bold;')
             return
 
-        for video_id, title, _ in self.video_data:
+        for video_id, title, _, _ in self.video_data:
             transcript = self.transcriptions.get(video_id, None)
             if transcript is None:
                 self.status_label.setText(f"Pobieranie transkrypcji dla wideo: {title}")
@@ -371,7 +380,7 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
             "videos": []
         }
 
-        for video_id, title, publish_date in self.video_data:
+        for video_id, title, publish_date, transcript_available in self.video_data:
             transcript = self.transcriptions.get(video_id)
             if not transcript:
                 # Jeśli transkrypcja nie była jeszcze pobrana, pobierz ją teraz
@@ -384,6 +393,7 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
                 "title": title,
                 "publish_date": publish_date,
                 "duration": duration,
+                "transcript_available": transcript_available,
                 "transcript": transcript
             })
 
