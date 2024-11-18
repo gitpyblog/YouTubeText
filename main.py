@@ -3,7 +3,6 @@ import re
 import sys
 import threading
 import json
-import sqlite3
 from PyQt5 import QtWidgets, QtGui, QtCore
 from googleapiclient.discovery import build
 from youtube_transcript_api import YouTubeTranscriptApi
@@ -17,15 +16,16 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
         self.channel_id = None
         self.channel_title = ""
         self.subscribers = "0"
+        self.video_count = "0"
+        self.channel_thumbnail_url = ""
         self.video_data = []
         self.transcriptions = {}  # Store transcriptions in memory
         self.init_ui()
-        self.init_db()
 
     def init_ui(self):
         # Inicjalizacja interfejsu użytkownika
         self.setWindowTitle("YouTubeText - Pobieranie transkrypcji z YouTube")
-        self.setGeometry(100, 100, 900, 600)
+        self.setGeometry(100, 100, 900, 700)
         self.setStyleSheet(self.load_stylesheet())
 
         # Wprowadzanie klucza API
@@ -47,8 +47,21 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
         self.fetch_channel_button.setFixedHeight(50)
         self.fetch_channel_button.setFixedWidth(100)
         self.fetch_channel_button.clicked.connect(self.fetch_channel_info)
-        self.channel_id_label = QtWidgets.QLabel("", self)
-        self.channel_id_label.setStyleSheet('font-size: 18px; color: #777777;')
+
+        # Informacje o kanale
+        self.channel_info_widget = QtWidgets.QWidget(self)
+        self.channel_info_layout = QtWidgets.QVBoxLayout(self.channel_info_widget)
+        self.channel_thumbnail_label = QtWidgets.QLabel(self)
+        self.channel_thumbnail_label.setFixedSize(100, 100)
+        self.channel_thumbnail_label.setAlignment(QtCore.Qt.AlignCenter)
+        self.channel_title_label = QtWidgets.QLabel("", self)
+        self.channel_title_label.setStyleSheet('font-weight: bold; font-size: 22px; color: #333333;')
+        self.channel_details_label = QtWidgets.QLabel("", self)
+        self.channel_details_label.setStyleSheet('font-size: 18px; color: #777777;')
+
+        self.channel_info_layout.addWidget(self.channel_thumbnail_label, alignment=QtCore.Qt.AlignCenter)
+        self.channel_info_layout.addWidget(self.channel_title_label, alignment=QtCore.Qt.AlignCenter)
+        self.channel_info_layout.addWidget(self.channel_details_label, alignment=QtCore.Qt.AlignCenter)
 
         # Wybór katalogu do zapisu transkrypcji
         self.output_dir_label = QtWidgets.QLabel("Katalog do zapisu transkrypcji:", self)
@@ -74,7 +87,7 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
         self.fetch_videos_button = QtWidgets.QPushButton("Pobierz listę filmów", self)
         self.fetch_videos_button.setFixedWidth(200)
         self.fetch_videos_button.setFixedHeight(50)
-        self.fetch_videos_button.clicked.connect(lambda: threading.Thread(target=self.fetch_videos).start())
+        self.fetch_videos_button.clicked.connect(self.fetch_videos)
 
         # Dodaj przyciski do eksportu do plików TXT i JSON
         self.export_txt_button = QtWidgets.QPushButton("Zrzuć transkrypcje do plików .txt", self)
@@ -99,7 +112,7 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
         form_layout.addWidget(self.channel_url_label, 1, 0)
         form_layout.addWidget(self.channel_url_input, 1, 1)
         form_layout.addWidget(self.fetch_channel_button, 1, 2)
-        form_layout.addWidget(self.channel_id_label, 2, 1, 1, 2)
+        form_layout.addWidget(self.channel_info_widget, 2, 0, 1, 3)
 
         form_layout.addWidget(self.output_dir_label, 3, 0)
         form_layout.addWidget(self.output_dir_input, 3, 1)
@@ -112,20 +125,6 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
         form_layout.addWidget(self.status_label, 8, 0, 1, 3)
 
         self.setLayout(form_layout)
-
-    def init_db(self):
-        # Inicjalizacja bazy danych SQLite
-        self.conn = sqlite3.connect("youtube_transcripts.db")
-        self.cursor = self.conn.cursor()
-        self.cursor.execute('''
-            CREATE TABLE IF NOT EXISTS videos (
-                video_id TEXT PRIMARY KEY,
-                title TEXT,
-                publish_date TEXT,
-                transcript TEXT
-            )
-        ''')
-        self.conn.commit()
 
     def load_stylesheet(self):
         return """
@@ -189,7 +188,7 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
         try:
             self.channel_id = self.get_channel_id_from_url(channel_url)
             self.fetch_channel_statistics()
-            self.channel_id_label.setText(f"ID Kanału: {self.channel_id}, Subskrybenci: {self.subscribers}")
+            self.update_channel_info()
         except ValueError as e:
             self.status_label.setText(str(e))
         except Exception as e:
@@ -209,8 +208,43 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
                 channel_info = response["items"][0]
                 self.channel_title = channel_info["snippet"]["title"]
                 self.subscribers = channel_info["statistics"].get("subscriberCount", "N/A")
+                self.video_count = channel_info["statistics"].get("videoCount", "0")
+                self.channel_thumbnail_url = channel_info["snippet"]["thumbnails"]["default"]["url"]
         except Exception as e:
             self.status_label.setText(f"Błąd pobierania statystyk kanału: {e}")
+
+    def update_channel_info(self):
+        # Aktualizuj informacje o kanale w interfejsie użytkownika
+        if self.channel_thumbnail_url:
+            image = QtGui.QImage()
+            image.loadFromData(self.fetch_image_data(self.channel_thumbnail_url))
+            pixmap = QtGui.QPixmap(image)
+
+        # Create a rounded version of the thumbnail image
+        rounded_pixmap = QtGui.QPixmap(100, 100)
+        rounded_pixmap.fill(QtCore.Qt.transparent)
+
+        painter = QtGui.QPainter(rounded_pixmap)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        path = QtGui.QPainterPath()
+        path.addEllipse(0, 0, 100, 100)
+        painter.setClipPath(path)
+        painter.drawPixmap(0, 0, 100, 100, pixmap)
+        painter.end()
+
+        self.channel_thumbnail_label.setPixmap(rounded_pixmap)
+        self.channel_title_label.setText(self.channel_title)
+        self.channel_details_label.setText(
+            f"ID Kanału: {self.channel_id}\nLiczba subskrybentów: {self.subscribers}\nLiczba filmów: {self.video_count}"
+        )
+
+    def fetch_image_data(self, url):
+        # Pobierz dane obrazu z URL
+        import requests
+        response = requests.get(url)
+        if response.status_code == 200:
+            return response.content
+        return b""
 
     def get_channel_id_from_url(self, channel_url):
         # Metoda do wyodrębnienia ID kanału z URL
@@ -268,23 +302,10 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
                 title = item["snippet"]["title"]
                 publish_date = item["snippet"]["publishedAt"]  # Pobierz datę publikacji
                 self.video_data.append((video_id, title, publish_date))
-                # Zapisz do bazy danych
-                self.cursor.execute('''
-                    INSERT OR IGNORE INTO videos (video_id, title, publish_date)
-                    VALUES (?, ?, ?)
-                ''', (video_id, title, publish_date))
-                # Pobierz transkrypcję
-                threading.Thread(target=self.download_transcription, args=(video_id, title, self.output_dir_input.text())).start()
-
-        self.conn.commit()
 
         self.video_list_text.clear()
         for video_id, title, publish_date in self.video_data:
             self.video_list_text.append(f"{title} (ID: {video_id}, Data: {publish_date})")
-
-        # Aktywuj przyciski eksportu po pobraniu transkrypcji
-        self.export_txt_button.setEnabled(True)
-        self.export_json_button.setEnabled(True)
 
         self.status_label.setText("Pobieranie zakończone.")
 
@@ -300,14 +321,10 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
             with open(output_path, "w", encoding="utf-8") as file:
                 file.write(transcript_text)
             self.transcriptions[video_id] = transcript_text  # Store transcription in memory
-            # Zapisz do bazy danych
-            self.cursor.execute('''
-                UPDATE videos SET transcript = ? WHERE video_id = ?
-            ''', (transcript_text, video_id))
-            self.conn.commit()
             self.status_label.setText(f"Transkrypcja zapisana: {output_filename}")
         except TranscriptsDisabled:
-            self.status_label.setText(f"Błąd: Nie udało się pobrać transkrypcji. Możliwe, że napisy są wyłączone dla tego filmu.")
+            self.status_label.setText(
+                f"Błąd: Nie udało się pobrać transkrypcji. Możliwe, że napisy są wyłączone dla tego filmu.")
         except NoTranscriptFound:
             self.status_label.setText(f"Błąd: Nie znaleziono transkrypcji dla tego filmu.")
         except Exception as e:
@@ -347,10 +364,12 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
         }
 
         for video_id, title, publish_date in self.video_data:
-            self.cursor.execute('''
-                SELECT transcript FROM videos WHERE video_id = ?
-            ''', (video_id,))
-            transcript = self.cursor.fetchone()[0]
+            transcript = self.transcriptions.get(video_id)
+            if not transcript:
+                # Jeśli transkrypcja nie była jeszcze pobrana, pobierz ją teraz
+                self.status_label.setText(f"Pobieranie transkrypcji dla wideo: {title}")
+                QtCore.QCoreApplication.processEvents()
+                transcript = self.download_transcription_synchronously(video_id)
             duration = self.get_video_duration(video_id)  # Pobierz długość filmu
             channel_data["videos"].append({
                 "video_id": video_id,
@@ -365,6 +384,18 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
             json.dump(channel_data, json_file, indent=4, ensure_ascii=False)
 
         self.status_label.setText(f"Transkrypcje zapisane w pliku: {output_path}")
+
+    def download_transcription_synchronously(self, video_id):
+        # Pobierz transkrypcję dla pojedynczego wideo w trybie synchronicznym
+        try:
+            transcripts = YouTubeTranscriptApi.list_transcripts(video_id)
+            transcript = transcripts.find_transcript(['pl'])
+            transcript_text = "\n".join([entry["text"] for entry in transcript.fetch()])
+            self.transcriptions[video_id] = transcript_text  # Store transcription in memory
+            return transcript_text
+        except Exception as e:
+            self.status_label.setText(f"Błąd pobierania transkrypcji: {e}")
+            return ""
 
     def get_video_duration(self, video_id):
         # Pobierz długość filmu na podstawie jego ID
