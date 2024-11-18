@@ -21,6 +21,9 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
         self.channel_thumbnail_url = ""
         self.video_data = []
         self.transcriptions = {}  # Store transcriptions in memory
+
+        # Load settings
+        self.settings = self.load_settings()
         self.init_ui()
 
     def init_ui(self):
@@ -34,6 +37,8 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
         self.api_key_label.setStyleSheet('font-weight: bold; font-size: 20px; color: #555555;')
         self.api_key_input = QtWidgets.QLineEdit(self)
         self.api_key_input.setFixedHeight(50)
+        if 'api_key' in self.settings:
+            self.api_key_input.setText(self.settings['api_key'])
         self.save_api_key_button = QtWidgets.QPushButton("Zapisz", self)
         self.save_api_key_button.setFixedHeight(50)
         self.save_api_key_button.setFixedWidth(100)
@@ -44,6 +49,8 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
         self.channel_url_label.setStyleSheet('font-weight: bold; font-size: 20px; color: #555555;')
         self.channel_url_input = QtWidgets.QLineEdit(self)
         self.channel_url_input.setFixedHeight(50)
+        if 'channel_url' in self.settings:
+            self.channel_url_input.setText(self.settings['channel_url'])
         self.fetch_channel_button = QtWidgets.QPushButton("Wczytaj", self)
         self.fetch_channel_button.setFixedHeight(50)
         self.fetch_channel_button.setFixedWidth(100)
@@ -177,6 +184,10 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
                 self.youtube_client = build("youtube", "v3", developerKey=api_key)
                 self.status_label.setText("🔑 Klucz API zapisano pomyślnie.")
                 self.api_key_input.setStyleSheet("background-color: #ccffcc; border: 1px solid #28a745;")  # Zielony po zapisaniu klucza API
+
+                # Save settings to file
+                self.settings['api_key'] = api_key
+                self.save_settings()
             except Exception as e:
                 self.status_label.setText(f"🔐 Błąd zapisu klucza API: {e}")
                 self.api_key_input.setStyleSheet("background-color: #ffcccc; border: 1px solid #dc3545;")  # Czerwony, jeśli wystąpił błąd
@@ -184,12 +195,17 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
 
     def fetch_channel_info(self):
         # Pobierz ID kanału YouTube na podstawie URL
+        channel_url = self.channel_url_input.text()
+        if channel_url:
+            # Save settings to file
+            self.settings['channel_url'] = channel_url
+            self.save_settings()
+
         if not self.youtube_client:
             self.status_label.setText("🔐 Klucz API nie został zapisany.")
             self.status_label.setStyleSheet('color: #dc3545; font-weight: bold;')
             return
 
-        channel_url = self.channel_url_input.text()
         try:
             self.channel_id = self.get_channel_id_from_url(channel_url)
             self.fetch_channel_statistics()
@@ -200,6 +216,43 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
         except Exception as e:
             self.status_label.setText(f"Błąd: {e}")
             self.status_label.setStyleSheet('color: #dc3545; font-weight: bold;')
+
+    def load_settings(self):
+        # Wczytaj ustawienia z pliku settings.json
+        if os.path.exists("settings.json"):
+            with open("settings.json", "r", encoding="utf-8") as file:
+                return json.load(file)
+        return {}
+
+    def save_settings(self):
+        # Zapisz ustawienia do pliku settings.json
+        with open("settings.json", "w", encoding="utf-8") as file:
+            json.dump(self.settings, file, indent=4, ensure_ascii=False)
+
+    def get_channel_id_from_url(self, channel_url):
+        # Metoda do wyodrębnienia ID kanału z URL
+        if "channel/" in channel_url:
+            return channel_url.split("channel/")[1]
+        elif "@" in channel_url:
+            username = channel_url.split("@")[1]
+            request = self.youtube_client.search().list(
+                part="snippet",
+                q=username,
+                type="channel",
+                maxResults=1
+            )
+            response = request.execute()
+            if "items" in response and len(response["items"]) > 0:
+                return response["items"][0]["snippet"]["channelId"]
+        else:
+            request = self.youtube_client.channels().list(
+                part="id",
+                forUsername=channel_url.split("/")[-1]
+            )
+            response = request.execute()
+            if "items" in response and len(response["items"]) > 0:
+                return response["items"][0]["id"]
+        raise ValueError("Nie udało się znaleźć ID kanału dla podanego URL.")
 
     def fetch_channel_statistics(self):
         # Pobierz statystyki kanału, w tym liczbę subskrybentów
@@ -252,31 +305,6 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
         if response.status_code == 200:
             return response.content
         return b""
-
-    def get_channel_id_from_url(self, channel_url):
-        # Metoda do wyodrębnienia ID kanału z URL
-        if "channel/" in channel_url:
-            return channel_url.split("channel/")[1]
-        elif "@" in channel_url:
-            username = channel_url.split("@")[1]
-            request = self.youtube_client.search().list(
-                part="snippet",
-                q=username,
-                type="channel",
-                maxResults=1
-            )
-            response = request.execute()
-            if "items" in response and len(response["items"]) > 0:
-                return response["items"][0]["snippet"]["channelId"]
-        else:
-            request = self.youtube_client.channels().list(
-                part="id",
-                forUsername=channel_url.split("/")[-1]
-            )
-            response = request.execute()
-            if "items" in response and len(response["items"]) > 0:
-                return response["items"][0]["id"]
-        raise ValueError("Nie udało się znaleźć ID kanału dla podanego URL.")
 
     def select_output_directory(self):
         # Wybierz katalog do zapisu transkrypcji
@@ -370,6 +398,7 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
                     file.write(transcript)
         self.status_label.setText(
             f"Transkrypcje zapisane w plikach TXT w katalogu: {output_dir} (sprawdź czy katalog istnieje i ma prawa do zapisu)")
+
     def export_to_json(self):
         # Eksportuj transkrypcje do pliku JSON
         output_dir = self.output_dir_input.text()
