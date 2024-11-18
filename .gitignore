@@ -5,6 +5,7 @@ __pycache__/
 *$py.class
 
 /transcriptions
+settings.json
 
 # C extensions
 *.so

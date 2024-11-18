@@ -90,6 +90,7 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
         self.video_list_widget = QtWidgets.QListWidget(self)
         self.video_list_widget.setFixedHeight(400)
         self.video_list_widget.setStyleSheet('font-size: 20px;')
+        self.video_list_widget.itemClicked.connect(self.on_video_item_clicked)
 
         # Przyciski do pobierania filmów i transkrypcji
         self.fetch_videos_button = QtWidgets.QPushButton("Pobierz listę filmów", self)
@@ -347,11 +348,12 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
                     title = item["snippet"]["title"]
                     publish_date = item["snippet"]["publishedAt"]
                     publish_date_formatted = datetime.strptime(publish_date, "%Y-%m-%dT%H:%M:%SZ").strftime("%d-%m-%Y %H:%M")
-                    transcript_available = "Tak" if self.is_transcript_available(video_id) else "Nie"
+                    transcript_available = "📄" if self.is_transcript_available(video_id) else "📒"
 
                     # Dodaj element bezpośrednio do widoku listy
                     duration = self.get_video_duration(video_id)
                     list_item = QtWidgets.QListWidgetItem(f"{publish_date_formatted} - {title} ({duration}) - Transkrypcja: {transcript_available}")
+                    list_item.setData(QtCore.Qt.UserRole, (video_id, publish_date_formatted.split()[0], title))  # Store video_id, date, and title for later use
                     self.video_list_widget.addItem(list_item)
 
                     # Aktualizuj liczbę przetworzonych filmów
@@ -479,6 +481,30 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
         if "S" in duration:
             seconds = int(duration.split("S")[0])
         return f"{hours:02}:{minutes:02}:{seconds:02}"
+
+    def on_video_item_clicked(self, item):
+        # Obsługuje kliknięcie elementu wideo, aby zapisać transkrypcję do pliku txt
+        video_id, publish_date, title = item.data(QtCore.Qt.UserRole)
+        if "📄" in item.text():  # Only handle if transcript is available
+            output_dir = self.output_dir_input.text()
+            suggested_filename = f"{publish_date} - {re.sub(r'[/*?"<>|:]', '', title)}.txt"
+            default_path = os.path.join(output_dir, suggested_filename)
+
+            options = QtWidgets.QFileDialog.Options()
+            file_path, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Zapisz transkrypcję", default_path, "Pliki tekstowe (*.txt)", options=options)
+            if file_path:
+                transcript = self.transcriptions.get(video_id, None)
+                if transcript is None:
+                    self.status_label.setText(f"Pobieranie transkrypcji dla wideo...")
+                    QtCore.QCoreApplication.processEvents()
+                    transcript = self.download_transcription_synchronously(video_id)
+                if transcript is not None:
+                    with open(file_path, "w", encoding="utf-8") as file:
+                        file.write(transcript)
+                    self.status_label.setText(f"Transkrypcja zapisana do pliku: {file_path}")
+                else:
+                    self.status_label.setText(f"Błąd pobierania transkrypcji dla wideo: {item.text()}")
+                    self.status_label.setStyleSheet('color: #dc3545; font-weight: bold;')
 
 
 if __name__ == "__main__":
