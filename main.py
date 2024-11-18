@@ -7,6 +7,7 @@ from PyQt5 import QtWidgets, QtGui, QtCore
 from googleapiclient.discovery import build
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api._errors import TranscriptsDisabled, NoTranscriptFound
+from datetime import datetime
 
 
 class YouTubeTranscriptApp(QtWidgets.QWidget):
@@ -25,7 +26,7 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
     def init_ui(self):
         # Inicjalizacja interfejsu użytkownika
         self.setWindowTitle("YouTubeText - Pobieranie transkrypcji z YouTube")
-        self.setGeometry(100, 100, 900, 700)
+        self.setGeometry(100, 100, 1300, 900)
         self.setStyleSheet(self.load_stylesheet())
 
         # Wprowadzanie klucza API
@@ -174,16 +175,18 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
         if api_key:
             try:
                 self.youtube_client = build("youtube", "v3", developerKey=api_key)
-                self.status_label.setText("🔑 Zapisano klucz API.")
-                self.api_key_input.setStyleSheet("background-color: #ccffcc;")  # Zielony po zapisaniu klucza API
+                self.status_label.setText("🔑 Klucz API zapisano pomyślnie.")
+                self.api_key_input.setStyleSheet("background-color: #ccffcc; border: 1px solid #28a745;")  # Zielony po zapisaniu klucza API
             except Exception as e:
-                self.status_label.setText(f"🔐 Błąd klucza API: {e}")
-                self.api_key_input.setStyleSheet("background-color: #ffcccc;")  # Czerwony, jeśli wystąpił błąd
+                self.status_label.setText(f"🔐 Błąd zapisu klucza API: {e}")
+                self.api_key_input.setStyleSheet("background-color: #ffcccc; border: 1px solid #dc3545;")  # Czerwony, jeśli wystąpił błąd
+                self.status_label.setStyleSheet('color: #dc3545; font-weight: bold;')
 
     def fetch_channel_info(self):
         # Pobierz ID kanału YouTube na podstawie URL
         if not self.youtube_client:
             self.status_label.setText("🔐 Klucz API nie został zapisany.")
+            self.status_label.setStyleSheet('color: #dc3545; font-weight: bold;')
             return
 
         channel_url = self.channel_url_input.text()
@@ -193,8 +196,10 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
             self.update_channel_info()
         except ValueError as e:
             self.status_label.setText(str(e))
+            self.status_label.setStyleSheet('color: #dc3545; font-weight: bold;')
         except Exception as e:
             self.status_label.setText(f"Błąd: {e}")
+            self.status_label.setStyleSheet('color: #dc3545; font-weight: bold;')
 
     def fetch_channel_statistics(self):
         # Pobierz statystyki kanału, w tym liczbę subskrybentów
@@ -214,6 +219,7 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
                 self.channel_thumbnail_url = channel_info["snippet"]["thumbnails"]["default"]["url"]
         except Exception as e:
             self.status_label.setText(f"Błąd pobierania statystyk kanału: {e}")
+            self.status_label.setStyleSheet('color: #dc3545; font-weight: bold;')
 
     def update_channel_info(self):
         # Aktualizuj informacje o kanale w interfejsie użytkownika
@@ -285,6 +291,7 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
         # Pobierz listę wideo z kanału
         if not self.youtube_client or not self.channel_id:
             self.status_label.setText("🔐 Klucz API lub ID kanału nie zostało zapisane.")
+            self.status_label.setStyleSheet('color: #dc3545; font-weight: bold;')
             return
 
         self.status_label.setText("Pobieranie listy wideo...")
@@ -302,11 +309,13 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
             if video_id:
                 title = item["snippet"]["title"]
                 publish_date = item["snippet"]["publishedAt"]  # Pobierz datę publikacji
-                self.video_data.append((video_id, title, publish_date))
+                publish_date_formatted = datetime.strptime(publish_date, "%Y-%m-%dT%H:%M:%SZ").strftime("%d-%m-%Y %H:%M")
+                self.video_data.append((video_id, title, publish_date_formatted))
 
         self.video_list_widget.clear()
         for video_id, title, publish_date in self.video_data:
-            list_item = QtWidgets.QListWidgetItem(f"{title} (ID: {video_id}, Data: {publish_date})")
+            duration = self.get_video_duration(video_id)  # Pobierz długość filmu
+            list_item = QtWidgets.QListWidgetItem(f"{publish_date} - {title} ({duration})")
             self.video_list_widget.addItem(list_item)
 
         self.status_label.setText("Pobieranie zakończone.")
@@ -316,6 +325,7 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
         output_dir = self.output_dir_input.text()
         if not output_dir:
             self.status_label.setText("Wybierz katalog do zapisu plików TXT.")
+            self.status_label.setStyleSheet('color: #dc3545; font-weight: bold;')
             return
 
         for video_id, title, _ in self.video_data:
@@ -338,6 +348,7 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
         output_dir = self.output_dir_input.text()
         if not output_dir:
             self.status_label.setText("Wybierz katalog do zapisu pliku JSON.")
+            self.status_label.setStyleSheet('color: #dc3545; font-weight: bold;')
             return
 
         channel_data = {
@@ -381,6 +392,7 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
             return transcript_text
         except Exception as e:
             self.status_label.setText(f"Błąd pobierania transkrypcji: {e}")
+            self.status_label.setStyleSheet('color: #dc3545; font-weight: bold;')
             return ""
 
     def get_video_duration(self, video_id):
