@@ -313,14 +313,21 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
         # Pobierz transkrypcję dla pojedynczego wideo
         try:
             transcripts = YouTubeTranscriptApi.list_transcripts(video_id)
-            transcript = transcripts.find_transcript(['pl'])
-            transcript_text = "\n".join([entry["text"] for entry in transcript.fetch()])
+            available_transcripts = transcripts.translate_transcripts(['pl', 'en'])
+            transcript = available_transcripts[0] if available_transcripts else transcripts.find_transcript(
+                transcripts.languages)
+            transcript_text = "\n".join([entry["text"] for entry in transcript.fetch() if entry["text"].strip()]).join(
+                [entry["text"] for entry in transcript.fetch() if entry["text"].strip()])
+            if not transcript_text:
+                self.status_label.setText(f"Brak dostępnej transkrypcji dla filmu: {title}")
+                return
             sanitized_title = re.sub(r'[/*?"<>|:]', "", title)
             output_filename = f"{sanitized_title}.txt"
             output_path = os.path.join(output_dir, output_filename)
             with open(output_path, "w", encoding="utf-8") as file:
                 file.write(transcript_text)
-            self.transcriptions[video_id] = transcript_text  # Store transcription in memory
+            self.transcriptions[
+                video_id] = transcript_text if transcript_text.strip() != "" else None  # Store transcription in memory
             self.status_label.setText(f"Transkrypcja zapisana: {output_filename}")
         except TranscriptsDisabled:
             self.status_label.setText(
@@ -338,14 +345,19 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
             return
 
         for video_id, title, publish_date in self.video_data:
-            transcript = self.transcriptions.get(video_id)
-            if transcript:
+            transcript = self.transcriptions.get(video_id, None)
+            if transcript is None:
+                self.status_label.setText(f"Pobieranie transkrypcji dla wideo: {title}")
+                QtCore.QCoreApplication.processEvents()
+                transcript = self.download_transcription_synchronously(video_id)
+            if transcript is not None:
                 sanitized_title = re.sub(r'[/*?"<>|:]', "", title)
                 output_filename = f"{sanitized_title}.txt"
                 output_path = os.path.join(output_dir, output_filename)
                 with open(output_path, "w", encoding="utf-8") as file:
                     file.write(transcript)
-        self.status_label.setText(f"Transkrypcje zapisane w plikach TXT w katalogu: {output_dir}")
+        self.status_label.setText(
+            f"Transkrypcje zapisane w plikach TXT w katalogu: {output_dir} (sprawdź czy katalog istnieje i ma prawa do zapisu)")
 
     def export_to_json(self):
         # Eksportuj transkrypcje do pliku JSON
