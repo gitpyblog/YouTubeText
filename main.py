@@ -295,26 +295,37 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
             return
 
         self.status_label.setText("Pobieranie listy wideo...")
-        request = self.youtube_client.search().list(
-            part="id,snippet",
-            channelId=self.channel_id,
-            maxResults=50,
-            type="video"
-        )
-        response = request.execute()
-
         self.video_data = []
-        for item in response.get("items", []):
-            video_id = item["id"].get("videoId")
-            if video_id:
-                title = item["snippet"]["title"]
-                publish_date = item["snippet"]["publishedAt"]  # Pobierz datę publikacji
-                publish_date_formatted = datetime.strptime(publish_date, "%Y-%m-%dT%H:%M:%SZ").strftime("%d-%m-%Y %H:%M")
-                self.video_data.append((video_id, title, publish_date_formatted))
+
+        # Ustawienia początkowe do stronicowania
+        page_token = None
+
+        while True:
+            request = self.youtube_client.search().list(
+                part="id,snippet",
+                channelId=self.channel_id,
+                maxResults=50,
+                type="video",
+                pageToken=page_token
+            )
+            response = request.execute()
+
+            for item in response.get("items", []):
+                video_id = item["id"].get("videoId")
+                if video_id:
+                    title = item["snippet"]["title"]
+                    publish_date = item["snippet"]["publishedAt"]
+                    publish_date_formatted = datetime.strptime(publish_date, "%Y-%m-%dT%H:%M:%SZ").strftime("%d-%m-%Y %H:%M")
+                    self.video_data.append((video_id, title, publish_date_formatted))
+
+            # Sprawdź, czy jest następna strona wyników
+            page_token = response.get("nextPageToken")
+            if not page_token:
+                break
 
         self.video_list_widget.clear()
         for video_id, title, publish_date in self.video_data:
-            duration = self.get_video_duration(video_id)  # Pobierz długość filmu
+            duration = self.get_video_duration(video_id)
             list_item = QtWidgets.QListWidgetItem(f"{publish_date} - {title} ({duration})")
             self.video_list_widget.addItem(list_item)
 
@@ -367,7 +378,7 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
                 self.status_label.setText(f"Pobieranie transkrypcji dla wideo: {title}")
                 QtCore.QCoreApplication.processEvents()
                 transcript = self.download_transcription_synchronously(video_id)
-            duration = self.get_video_duration(video_id)  # Pobierz długość filmu
+            duration = self.get_video_duration(video_id)
             channel_data["videos"].append({
                 "video_id": video_id,
                 "title": title,
