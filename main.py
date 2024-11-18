@@ -90,6 +90,11 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
         self.fetch_videos_button.setFixedHeight(50)
         self.fetch_videos_button.clicked.connect(self.fetch_videos)
 
+        # Progres bar
+        self.progress_bar = QtWidgets.QProgressBar(self)
+        self.progress_bar.setFixedHeight(30)
+        self.progress_bar.setVisible(False)
+
         # Dodaj przyciski do eksportu do plików TXT i JSON
         self.export_txt_button = QtWidgets.QPushButton("Zrzuć transkrypcje do plików .txt", self)
         self.export_txt_button.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
@@ -119,7 +124,8 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
         form_layout.addWidget(self.output_dir_input, 3, 1)
         form_layout.addWidget(self.output_dir_button, 3, 2)
 
-        form_layout.addWidget(self.fetch_videos_button, 4, 0, 1, 3)
+        form_layout.addWidget(self.fetch_videos_button, 4, 0)
+        form_layout.addWidget(self.progress_bar, 4, 1, 1, 2)
         form_layout.addWidget(self.video_list_widget, 5, 0, 1, 3)
         form_layout.addWidget(self.export_txt_button, 6, 0, 1, 3)
         form_layout.addWidget(self.export_json_button, 7, 0, 1, 3)
@@ -166,6 +172,13 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
             QLabel {
                 color: #000000;
                 font-size: 20px;
+            }
+            QProgressBar {
+                border: 1px solid #d0d0d0;
+                border-radius: 5px;
+                text-align: center;
+                font-size: 18px;
+                background-color: #ffffff;
             }
         """
 
@@ -296,9 +309,12 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
 
         self.status_label.setText("Pobieranie listy wideo...")
         self.video_data = []
+        self.progress_bar.setVisible(True)
+        self.progress_bar.setValue(0)
 
         # Ustawienia początkowe do stronicowania
         page_token = None
+        total_videos = 0
 
         while True:
             request = self.youtube_client.search().list(
@@ -310,27 +326,37 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
             )
             response = request.execute()
 
-            for item in response.get("items", []):
+            items = response.get("items", [])
+            total_videos += len(items)
+
+            for index, item in enumerate(items):
                 video_id = item["id"].get("videoId")
                 if video_id:
                     title = item["snippet"]["title"]
                     publish_date = item["snippet"]["publishedAt"]
                     publish_date_formatted = datetime.strptime(publish_date, "%Y-%m-%dT%H:%M:%SZ").strftime("%d-%m-%Y %H:%M")
                     transcript_available = "Tak" if self.is_transcript_available(video_id) else "Nie"
-                    self.video_data.append((video_id, title, publish_date_formatted, transcript_available))
+
+                    # Dodaj element bezpośrednio do widoku listy
+                    duration = self.get_video_duration(video_id)
+                    list_item = QtWidgets.QListWidgetItem(f"{publish_date_formatted} - {title} ({duration}) - Transkrypcja: {transcript_available}")
+                    self.video_list_widget.addItem(list_item)
+
+                    # Aktualizuj pasek postępu
+                    progress = int((index + 1) / len(items) * 100)
+                    self.progress_bar.setValue(progress)
+
+                    # Przetwarzanie wydarzeń Qt, aby interfejs był responsywny
+                    QtCore.QCoreApplication.processEvents()
 
             # Sprawdź, czy jest następna strona wyników
             page_token = response.get("nextPageToken")
             if not page_token:
                 break
 
-        self.video_list_widget.clear()
-        for video_id, title, publish_date, transcript_available in self.video_data:
-            duration = self.get_video_duration(video_id)
-            list_item = QtWidgets.QListWidgetItem(f"{publish_date} - {title} ({duration}) - Transkrypcja: {transcript_available}")
-            self.video_list_widget.addItem(list_item)
-
+        self.progress_bar.setValue(100)
         self.status_label.setText("Pobieranie zakończone.")
+        self.progress_bar.setVisible(False)
 
     def is_transcript_available(self, video_id):
         # Sprawdź, czy transkrypcja jest dostępna dla wideo
