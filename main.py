@@ -1,8 +1,8 @@
 import os
 import re
 import sys
-import threading
 import json
+import requests
 from PyQt5 import QtWidgets, QtGui, QtCore
 from googleapiclient.discovery import build
 from youtube_transcript_api import YouTubeTranscriptApi
@@ -78,10 +78,10 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
         self.status_label = QtWidgets.QLabel("", self)
         self.status_label.setStyleSheet('font-size: 18px;')
 
-        # Widok listy wideo
-        self.video_list_text = QtWidgets.QTextEdit(self)
-        self.video_list_text.setReadOnly(True)
-        self.video_list_text.setFixedHeight(200)
+        # Widok listy wideo (QListWidget zamiast QTextEdit)
+        self.video_list_widget = QtWidgets.QListWidget(self)
+        self.video_list_widget.setFixedHeight(400)
+        self.video_list_widget.setStyleSheet('font-size: 20px;')
 
         # Przyciski do pobierania filmów i transkrypcji
         self.fetch_videos_button = QtWidgets.QPushButton("Pobierz listę filmów", self)
@@ -119,7 +119,7 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
         form_layout.addWidget(self.output_dir_button, 3, 2)
 
         form_layout.addWidget(self.fetch_videos_button, 4, 0, 1, 3)
-        form_layout.addWidget(self.video_list_text, 5, 0, 1, 3)
+        form_layout.addWidget(self.video_list_widget, 5, 0, 1, 3)
         form_layout.addWidget(self.export_txt_button, 6, 0, 1, 3)
         form_layout.addWidget(self.export_json_button, 7, 0, 1, 3)
         form_layout.addWidget(self.status_label, 8, 0, 1, 3)
@@ -155,7 +155,7 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
                 font-size: 20px;
                 border-radius: 5px;
             }
-            QTextEdit {
+            QListWidget {
                 background-color: #ffffff;
                 border: 1px solid #d0d0d0;
                 padding: 5px;
@@ -222,19 +222,19 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
             image.loadFromData(self.fetch_image_data(self.channel_thumbnail_url))
             pixmap = QtGui.QPixmap(image)
 
-        # Create a rounded version of the thumbnail image
-        rounded_pixmap = QtGui.QPixmap(100, 100)
-        rounded_pixmap.fill(QtCore.Qt.transparent)
+            # Create a rounded version of the thumbnail image
+            rounded_pixmap = QtGui.QPixmap(100, 100)
+            rounded_pixmap.fill(QtCore.Qt.transparent)
 
-        painter = QtGui.QPainter(rounded_pixmap)
-        painter.setRenderHint(QtGui.QPainter.Antialiasing)
-        path = QtGui.QPainterPath()
-        path.addEllipse(0, 0, 100, 100)
-        painter.setClipPath(path)
-        painter.drawPixmap(0, 0, 100, 100, pixmap)
-        painter.end()
+            painter = QtGui.QPainter(rounded_pixmap)
+            painter.setRenderHint(QtGui.QPainter.Antialiasing)
+            path = QtGui.QPainterPath()
+            path.addEllipse(0, 0, 100, 100)
+            painter.setClipPath(path)
+            painter.drawPixmap(0, 0, 100, 100, pixmap)
+            painter.end()
 
-        self.channel_thumbnail_label.setPixmap(rounded_pixmap)
+            self.channel_thumbnail_label.setPixmap(rounded_pixmap)
         self.channel_title_label.setText(self.channel_title)
         self.channel_details_label.setText(
             f"ID Kanału: {self.channel_id}\nLiczba subskrybentów: {self.subscribers}\nLiczba filmów: {self.video_count}"
@@ -242,7 +242,6 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
 
     def fetch_image_data(self, url):
         # Pobierz dane obrazu z URL
-        import requests
         response = requests.get(url)
         if response.status_code == 200:
             return response.content
@@ -305,39 +304,12 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
                 publish_date = item["snippet"]["publishedAt"]  # Pobierz datę publikacji
                 self.video_data.append((video_id, title, publish_date))
 
-        self.video_list_text.clear()
+        self.video_list_widget.clear()
         for video_id, title, publish_date in self.video_data:
-            self.video_list_text.append(f"{title} (ID: {video_id}, Data: {publish_date})")
+            list_item = QtWidgets.QListWidgetItem(f"{title} (ID: {video_id}, Data: {publish_date})")
+            self.video_list_widget.addItem(list_item)
 
         self.status_label.setText("Pobieranie zakończone.")
-
-    def download_transcription(self, video_id, title, output_dir):
-        # Pobierz transkrypcję dla pojedynczego wideo
-        try:
-            transcripts = YouTubeTranscriptApi.list_transcripts(video_id)
-            available_transcripts = transcripts.translate_transcripts(['pl', 'en'])
-            transcript = available_transcripts[0] if available_transcripts else transcripts.find_transcript(
-                transcripts.languages)
-            transcript_text = "\n".join([entry["text"] for entry in transcript.fetch() if entry["text"].strip()]).join(
-                [entry["text"] for entry in transcript.fetch() if entry["text"].strip()])
-            if not transcript_text:
-                self.status_label.setText(f"Brak dostępnej transkrypcji dla filmu: {title}")
-                return
-            sanitized_title = re.sub(r'[/*?"<>|:]', "", title)
-            output_filename = f"{sanitized_title}.txt"
-            output_path = os.path.join(output_dir, output_filename)
-            with open(output_path, "w", encoding="utf-8") as file:
-                file.write(transcript_text)
-            self.transcriptions[
-                video_id] = transcript_text if transcript_text.strip() != "" else None  # Store transcription in memory
-            self.status_label.setText(f"Transkrypcja zapisana: {output_filename}")
-        except TranscriptsDisabled:
-            self.status_label.setText(
-                f"Błąd: Nie udało się pobrać transkrypcji. Możliwe, że napisy są wyłączone dla tego filmu.")
-        except NoTranscriptFound:
-            self.status_label.setText(f"Błąd: Nie znaleziono transkrypcji dla tego filmu.")
-        except Exception as e:
-            self.status_label.setText(f"Błąd pobierania transkrypcji: {e}")
 
     def export_to_txt(self):
         # Eksportuj transkrypcje do pojedynczych plików TXT
@@ -346,7 +318,7 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
             self.status_label.setText("Wybierz katalog do zapisu plików TXT.")
             return
 
-        for video_id, title, publish_date in self.video_data:
+        for video_id, title, _ in self.video_data:
             transcript = self.transcriptions.get(video_id, None)
             if transcript is None:
                 self.status_label.setText(f"Pobieranie transkrypcji dla wideo: {title}")
