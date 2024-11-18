@@ -175,8 +175,10 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
             try:
                 self.youtube_client = build("youtube", "v3", developerKey=api_key)
                 self.status_label.setText("🔑 Zapisano klucz API.")
+                self.api_key_input.setStyleSheet("background-color: #ccffcc;")  # Zielony po zapisaniu klucza API
             except Exception as e:
                 self.status_label.setText(f"🔐 Błąd klucza API: {e}")
+                self.api_key_input.setStyleSheet("background-color: #ffcccc;")  # Czerwony, jeśli wystąpił błąd
 
     def fetch_channel_info(self):
         # Pobierz ID kanału YouTube na podstawie URL
