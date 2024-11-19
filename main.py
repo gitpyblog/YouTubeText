@@ -362,6 +362,9 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
                     list_item.setData(QtCore.Qt.UserRole, (video_id, publish_date_formatted.split()[0], title))  # Store video_id, date, and title for later use
                     self.video_list_widget.addItem(list_item)
 
+                    # Automatyczne przewijanie listy
+                    self.video_list_widget.scrollToItem(list_item)
+
                     # Aktualizuj liczbę przetworzonych filmów
                     videos_processed += 1
                     percentage_completed = int((videos_processed / total_videos) * 100) if total_videos > 0 else 100
