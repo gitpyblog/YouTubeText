@@ -1,13 +1,14 @@
+import json
 import os
 import re
 import sys
-import json
+from datetime import datetime
+
 import requests
 from PyQt5 import QtWidgets, QtGui, QtCore
 from googleapiclient.discovery import build
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api._errors import TranscriptsDisabled, NoTranscriptFound
-from datetime import datetime
 
 
 class YouTubeTranscriptApp(QtWidgets.QWidget):
@@ -189,14 +190,16 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
             try:
                 self.youtube_client = build("youtube", "v3", developerKey=api_key)
                 self.status_label.setText("🔑 Klucz API zapisano pomyślnie.")
-                self.api_key_input.setStyleSheet("background-color: #ccffcc; border: 1px solid #28a745;")  # Zielony po zapisaniu klucza API
+                self.api_key_input.setStyleSheet(
+                    "background-color: #ccffcc; border: 1px solid #28a745;")  # Zielony po zapisaniu klucza API
 
                 # Save settings to file
                 self.settings['api_key'] = api_key
                 self.save_settings()
             except Exception as e:
                 self.status_label.setText(f"🔐 Błąd zapisu klucza API: {e}")
-                self.api_key_input.setStyleSheet("background-color: #ffcccc; border: 1px solid #dc3545;")  # Czerwony, jeśli wystąpił błąd
+                self.api_key_input.setStyleSheet(
+                    "background-color: #ffcccc; border: 1px solid #dc3545;")  # Czerwony, jeśli wystąpił błąd
                 self.status_label.setStyleSheet('color: #dc3545; font-weight: bold;')
 
     def fetch_channel_info(self):
@@ -353,13 +356,16 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
                 if video_id:
                     title = item["snippet"]["title"]
                     publish_date = item["snippet"]["publishedAt"]
-                    publish_date_formatted = datetime.strptime(publish_date, "%Y-%m-%dT%H:%M:%SZ").strftime("%d-%m-%Y %H:%M")
+                    publish_date_formatted = datetime.strptime(publish_date, "%Y-%m-%dT%H:%M:%SZ").strftime(
+                        "%d.%m.%Y")
                     transcript_available = "📄" if self.is_transcript_available(video_id) else "📒"
 
                     # Dodaj element bezpośrednio do widoku listy
                     duration = self.get_video_duration(video_id)
-                    list_item = QtWidgets.QListWidgetItem(f"{publish_date_formatted} - {title} ({duration}) {transcript_available}")
-                    list_item.setData(QtCore.Qt.UserRole, (video_id, publish_date_formatted.split()[0], title))  # Store video_id, date, and title for later use
+                    list_item = QtWidgets.QListWidgetItem(
+                        f"{publish_date_formatted} - {title} ({duration}) {transcript_available}")
+                    list_item.setData(QtCore.Qt.UserRole, (video_id, publish_date_formatted.split()[0],
+                                                           title))  # Store video_id, date, and title for later use
                     self.video_list_widget.addItem(list_item)
 
                     # Automatyczne przewijanie listy
@@ -503,7 +509,8 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
             default_path = os.path.join(output_dir, suggested_filename)
 
             options = QtWidgets.QFileDialog.Options()
-            file_path, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Zapisz transkrypcję", default_path, "Pliki tekstowe (*.txt)", options=options)
+            file_path, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Zapisz transkrypcję", default_path,
+                                                                 "Pliki tekstowe (*.txt)", options=options)
             if file_path:
                 transcript = self.transcriptions.get(video_id, None)
                 if transcript is None:
