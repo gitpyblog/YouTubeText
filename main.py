@@ -358,7 +358,7 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
 
                     # Dodaj element bezpośrednio do widoku listy
                     duration = self.get_video_duration(video_id)
-                    list_item = QtWidgets.QListWidgetItem(f"{publish_date_formatted} - {title} ({duration}) - {transcript_available}")
+                    list_item = QtWidgets.QListWidgetItem(f"{publish_date_formatted} - {title} ({duration}) {transcript_available}")
                     list_item.setData(QtCore.Qt.UserRole, (video_id, publish_date_formatted.split()[0], title))  # Store video_id, date, and title for later use
                     self.video_list_widget.addItem(list_item)
 
