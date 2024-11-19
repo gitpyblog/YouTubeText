@@ -99,8 +99,8 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
         self.fetch_videos_button.clicked.connect(self.fetch_videos)
 
         # Dodanie pola do wyświetlania procentu pobierania filmów
-        self.download_progress_label = QtWidgets.QLabel("Procent pobierania: 0%", self)
-        self.download_progress_label.setStyleSheet('font-size: 18px; color: #555555;')
+        self.download_progress_label = QtWidgets.QLabel("0%", self)
+        self.download_progress_label.setStyleSheet('font-size: 22px; color: #555555; font-weight: bold;')
 
         # Dodaj przyciski do eksportu do plików TXT i JSON
         self.export_txt_button = QtWidgets.QPushButton("Zrzuć transkrypcje do plików .txt", self)
@@ -365,7 +365,7 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
                     # Aktualizuj liczbę przetworzonych filmów
                     videos_processed += 1
                     percentage_completed = int((videos_processed / total_videos) * 100) if total_videos > 0 else 100
-                    self.download_progress_label.setText(f"Procent pobierania: {percentage_completed}%")
+                    self.download_progress_label.setText(f"{percentage_completed}%")
                     self.status_label.setText(f"Pobrano {videos_processed} z {total_videos} filmów")
 
                     # Przetwarzanie wydarzeń Qt, aby interfejs był responsywny
@@ -377,7 +377,7 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
                 break
 
         self.status_label.setText("Pobieranie zakończone.")
-        self.download_progress_label.setText("Procent pobierania: 100%")
+        self.download_progress_label.setText("100%")
 
     def is_transcript_available(self, video_id):
         # Sprawdź, czy transkrypcja jest dostępna dla wideo
