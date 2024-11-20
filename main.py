@@ -7,9 +7,10 @@ from datetime import datetime
 import requests
 from PyQt5 import QtWidgets, QtGui, QtCore
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api._errors import TranscriptsDisabled, NoTranscriptFound
-
+from pytube import YouTube  # Dodano import pytube
 
 class YouTubeTranscriptApp(QtWidgets.QWidget):
     def __init__(self):
@@ -21,9 +22,9 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
         self.video_count = "0"
         self.channel_thumbnail_url = ""
         self.video_data = []
-        self.transcriptions = {}  # Store transcriptions in memory
+        self.transcriptions = {}  # Przechowuj transkrypcje w pamięci
 
-        # Load settings
+        # Wczytaj ustawienia
         self.settings = self.load_settings()
         self.init_ui()
 
@@ -87,23 +88,23 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
         self.status_label = QtWidgets.QLabel("", self)
         self.status_label.setStyleSheet('font-size: 18px;')
 
-        # Widok listy wideo (QListWidget zamiast QTextEdit)
+        # Widok listy wideo
         self.video_list_widget = QtWidgets.QListWidget(self)
         self.video_list_widget.setFixedHeight(400)
         self.video_list_widget.setStyleSheet('font-size: 20px;')
         self.video_list_widget.itemClicked.connect(self.on_video_item_clicked)
 
-        # Przyciski do pobierania filmów i transkrypcji
+        # Przyciski do pobierania filmów
         self.fetch_videos_button = QtWidgets.QPushButton("Pobierz listę filmów", self)
         self.fetch_videos_button.setFixedWidth(200)
         self.fetch_videos_button.setFixedHeight(50)
         self.fetch_videos_button.clicked.connect(self.fetch_videos)
 
-        # Dodanie pola do wyświetlania procentu pobierania filmów
+        # Pole do wyświetlania procentu pobierania filmów
         self.download_progress_label = QtWidgets.QLabel("0%", self)
         self.download_progress_label.setStyleSheet('font-size: 22px; color: #555555; font-weight: bold;')
 
-        # Dodaj przyciski do eksportu do plików TXT i JSON
+        # Przyciski do eksportu
         self.export_txt_button = QtWidgets.QPushButton("Zrzuć transkrypcje do plików .txt", self)
         self.export_txt_button.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         self.export_txt_button.setFixedHeight(50)
@@ -193,7 +194,7 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
                 self.api_key_input.setStyleSheet(
                     "background-color: #ccffcc; border: 1px solid #28a745;")  # Zielony po zapisaniu klucza API
 
-                # Save settings to file
+                # Zapisz ustawienia do pliku
                 self.settings['api_key'] = api_key
                 self.save_settings()
             except Exception as e:
@@ -206,7 +207,7 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
         # Pobierz ID kanału YouTube na podstawie URL
         channel_url = self.channel_url_input.text()
         if channel_url:
-            # Save settings to file
+            # Zapisz ustawienia do pliku
             self.settings['channel_url'] = channel_url
             self.save_settings()
 
@@ -290,7 +291,7 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
             image.loadFromData(self.fetch_image_data(self.channel_thumbnail_url))
             pixmap = QtGui.QPixmap(image)
 
-            # Create a rounded version of the thumbnail image
+            # Stwórz zaokrąglony obraz miniaturki
             rounded_pixmap = QtGui.QPixmap(100, 100)
             rounded_pixmap.fill(QtCore.Qt.transparent)
 
@@ -325,7 +326,9 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
             self.status_label.setText(f"Wybrano katalog: {directory}")
 
     def fetch_videos(self):
-        # Pobierz listę wideo z kanału
+        """
+        Zaktualizowana metoda pobierania listy wideo, w tym informacje o dostępności napisów.
+        """
         if not self.youtube_client or not self.channel_id:
             self.status_label.setText("🔐 Klucz API lub ID kanału nie zostało zapisane.")
             self.status_label.setStyleSheet('color: #dc3545; font-weight: bold;')
@@ -333,6 +336,7 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
 
         self.status_label.setText("Pobieranie listy wideo...")
         self.video_data = []
+        self.video_list_widget.clear()  # Wyczyść listę przed dodaniem nowych elementów
 
         # Ustawienia początkowe do stronicowania
         page_token = None
@@ -340,137 +344,79 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
         videos_processed = 0
 
         while True:
-            request = self.youtube_client.search().list(
-                part="id,snippet",
-                channelId=self.channel_id,
-                maxResults=50,
-                type="video",
-                pageToken=page_token,
-                order="date"  # Dodanie tego parametru wymusza pobranie filmów od najnowszych do najstarszych
-            )
-            response = request.execute()
+            try:
+                request = self.youtube_client.search().list(
+                    part="id,snippet",
+                    channelId=self.channel_id,
+                    maxResults=50,
+                    type="video",
+                    pageToken=page_token,
+                    order="date"
+                )
+                response = request.execute()
 
-            items = response.get("items", [])
-            for item in items:
-                video_id = item["id"].get("videoId")
-                if video_id:
-                    title = item["snippet"]["title"]
-                    publish_date = item["snippet"]["publishedAt"]
-                    publish_date_formatted = datetime.strptime(publish_date, "%Y-%m-%dT%H:%M:%SZ").strftime(
-                        "%d.%m.%Y")
-                    transcript_available = "📄" if self.is_transcript_available(video_id) else "📒"
+                items = response.get("items", [])
+                for item in items:
+                    video_id = item["id"].get("videoId")
+                    if video_id:
+                        title = item["snippet"]["title"]
+                        publish_date = item["snippet"]["publishedAt"]
+                        publish_date_formatted = datetime.strptime(publish_date, "%Y-%m-%dT%H:%M:%SZ").strftime("%d.%m.%Y")
 
-                    # Dodaj element bezpośrednio do widoku listy
-                    duration = self.get_video_duration(video_id)
-                    list_item = QtWidgets.QListWidgetItem(
-                        f"{publish_date_formatted} - {title} ({duration}) {transcript_available}")
-                    list_item.setData(QtCore.Qt.UserRole, (video_id, publish_date_formatted.split()[0],
-                                                           title))  # Store video_id, date, and title for later use
-                    self.video_list_widget.addItem(list_item)
+                        # Sprawdzenie, czy transkrypcja jest dostępna
+                        transcript_available = "📄" if self.is_transcript_available(video_id) else "📒"
 
-                    # Automatyczne przewijanie listy
-                    self.video_list_widget.scrollToItem(list_item)
+                        # Dodaj element bezpośrednio do widoku listy
+                        duration = self.get_video_duration(video_id)
+                        list_item = QtWidgets.QListWidgetItem(
+                            f"{publish_date_formatted} - {title} ({duration}) {transcript_available}"
+                        )
+                        list_item.setData(QtCore.Qt.UserRole, (video_id, publish_date_formatted, title))
+                        self.video_list_widget.addItem(list_item)
 
-                    # Aktualizuj liczbę przetworzonych filmów
-                    videos_processed += 1
-                    percentage_completed = int((videos_processed / total_videos) * 100) if total_videos > 0 else 100
-                    self.download_progress_label.setText(f"{percentage_completed}%")
-                    self.status_label.setText(f"Pobrano {videos_processed} z {total_videos} filmów")
+                        # Automatyczne przewijanie listy
+                        self.video_list_widget.scrollToItem(list_item)
 
-                    # Przetwarzanie wydarzeń Qt, aby interfejs był responsywny
-                    QtCore.QCoreApplication.processEvents()
+                        # Aktualizuj liczbę przetworzonych filmów
+                        videos_processed += 1
+                        percentage_completed = int((videos_processed / total_videos) * 100) if total_videos > 0 else 100
+                        self.download_progress_label.setText(f"{percentage_completed}%")
+                        self.status_label.setText(f"Pobrano {videos_processed} z {total_videos} filmów")
 
-            # Sprawdź, czy jest następna strona wyników
-            page_token = response.get("nextPageToken")
-            if not page_token:
+                        # Przetwarzanie wydarzeń Qt, aby interfejs był responsywny
+                        QtCore.QCoreApplication.processEvents()
+
+                # Sprawdź, czy jest następna strona wyników
+                page_token = response.get("nextPageToken")
+                if not page_token:
+                    break
+
+            except HttpError as e:
+                self.status_label.setText(f"Błąd pobierania filmów: {e}")
+                self.status_label.setStyleSheet('color: #dc3545; font-weight: bold;')
                 break
 
         self.status_label.setText("Pobieranie zakończone.")
         self.download_progress_label.setText("100%")
 
     def is_transcript_available(self, video_id):
-        # Sprawdź, czy transkrypcja jest dostępna dla wideo
         try:
-            YouTubeTranscriptApi.get_transcript(video_id, languages=['pl'])
+            # Spróbuj użyć YouTubeTranscriptApi
+            transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
             return True
-        except (TranscriptsDisabled, NoTranscriptFound):
-            return False
-
-    def export_to_txt(self):
-        # Eksportuj transkrypcje do pojedynczych plików TXT
-        output_dir = self.output_dir_input.text()
-        if not output_dir:
-            self.status_label.setText("Wybierz katalog do zapisu plików TXT.")
-            self.status_label.setStyleSheet('color: #dc3545; font-weight: bold;')
-            return
-
-        for video_id, title, _, _ in self.video_data:
-            transcript = self.transcriptions.get(video_id, None)
-            if transcript is None:
-                self.status_label.setText(f"Pobieranie transkrypcji dla wideo: {title}")
-                QtCore.QCoreApplication.processEvents()
-                transcript = self.download_transcription_synchronously(video_id)
-            if transcript is not None:
-                sanitized_title = re.sub(r'[/*?"<>|:]', "", title)
-                output_filename = f"{sanitized_title}.txt"
-                output_path = os.path.join(output_dir, output_filename)
-                with open(output_path, "w", encoding="utf-8") as file:
-                    file.write(transcript)
-        self.status_label.setText(
-            f"Transkrypcje zapisane w plikach TXT w katalogu: {output_dir} (sprawdź czy katalog istnieje i ma prawa do zapisu)")
-
-    def export_to_json(self):
-        # Eksportuj transkrypcje do pliku JSON
-        output_dir = self.output_dir_input.text()
-        if not output_dir:
-            self.status_label.setText("Wybierz katalog do zapisu pliku JSON.")
-            self.status_label.setStyleSheet('color: #dc3545; font-weight: bold;')
-            return
-
-        channel_data = {
-            "channel_id": self.channel_id,
-            "channel_title": self.channel_title,
-            "channel_url": f"https://www.youtube.com/channel/{self.channel_id}",
-            "subscribers": self.subscribers,
-            "total_videos": len(self.video_data),
-            "videos": []
-        }
-
-        for video_id, title, publish_date, transcript_available in self.video_data:
-            transcript = self.transcriptions.get(video_id)
-            if not transcript:
-                # Jeśli transkrypcja nie była jeszcze pobrana, pobierz ją teraz
-                self.status_label.setText(f"Pobieranie transkrypcji dla wideo: {title}")
-                QtCore.QCoreApplication.processEvents()
-                transcript = self.download_transcription_synchronously(video_id)
-            duration = self.get_video_duration(video_id)
-            channel_data["videos"].append({
-                "video_id": video_id,
-                "title": title,
-                "publish_date": publish_date,
-                "duration": duration,
-                "transcript_available": transcript_available,
-                "transcript": transcript
-            })
-
-        output_path = os.path.join(output_dir, "channel_transcriptions.json")
-        with open(output_path, "w", encoding="utf-8") as json_file:
-            json.dump(channel_data, json_file, indent=4, ensure_ascii=False)
-
-        self.status_label.setText(f"Transkrypcje zapisane w pliku: {output_path}")
-
-    def download_transcription_synchronously(self, video_id):
-        # Pobierz transkrypcję dla pojedynczego wideo w trybie synchronicznym
-        try:
-            transcripts = YouTubeTranscriptApi.list_transcripts(video_id)
-            transcript = transcripts.find_transcript(['pl'])
-            transcript_text = "\n".join([entry["text"] for entry in transcript.fetch()])
-            self.transcriptions[video_id] = transcript_text  # Store transcription in memory
-            return transcript_text
         except Exception as e:
-            self.status_label.setText(f"Błąd pobierania transkrypcji: {e}")
-            self.status_label.setStyleSheet('color: #dc3545; font-weight: bold;')
-            return ""
+            print(f"YouTubeTranscriptApi nie może pobrać transkrypcji: {e}")
+            # Spróbuj użyć pytube jako alternatywy
+            try:
+                yt = YouTube(f'https://www.youtube.com/watch?v={video_id}')
+                captions = yt.captions
+                if captions:
+                    return True
+                else:
+                    return False
+            except Exception as e:
+                print(f"pytube nie może pobrać transkrypcji: {e}")
+                return False
 
     def get_video_duration(self, video_id):
         # Pobierz długość filmu na podstawie jego ID
@@ -503,9 +449,9 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
     def on_video_item_clicked(self, item):
         # Obsługuje kliknięcie elementu wideo, aby zapisać transkrypcję do pliku txt
         video_id, publish_date, title = item.data(QtCore.Qt.UserRole)
-        if "📄" in item.text():  # Only handle if transcript is available
+        if "📄" in item.text():  # Tylko jeśli transkrypcja jest dostępna
             output_dir = self.output_dir_input.text()
-            suggested_filename = f"{publish_date} - {re.sub(r'[/*?"<>|:]', '', title)}.txt"
+            suggested_filename = f"{publish_date} - {re.sub(r'[/*?\"<>|:]', '', title)}.txt"
             default_path = os.path.join(output_dir, suggested_filename)
 
             options = QtWidgets.QFileDialog.Options()
@@ -525,6 +471,118 @@ class YouTubeTranscriptApp(QtWidgets.QWidget):
                     self.status_label.setText(f"Błąd pobierania transkrypcji dla wideo: {item.text()}")
                     self.status_label.setStyleSheet('color: #dc3545; font-weight: bold;')
 
+    def download_transcription_synchronously(self, video_id):
+        # Pobierz transkrypcję za pomocą YouTubeTranscriptApi lub pytube
+        transcript_text = None
+        try:
+            # Spróbuj użyć YouTubeTranscriptApi
+            transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+            # Spróbuj znaleźć transkrypcję ręcznie dodaną
+            try:
+                transcript = transcript_list.find_manually_created_transcript(['pl', 'en'])
+            except NoTranscriptFound:
+                # Jeśli nie znaleziono, spróbuj znaleźć transkrypcję automatycznie wygenerowaną
+                transcript = transcript_list.find_generated_transcript(['pl', 'en'])
+            # Pobierz dane transkrypcji
+            transcript_data = transcript.fetch()
+            # Konwertuj dane transkrypcji do tekstu
+            transcript_text = '\n'.join([entry['text'] for entry in transcript_data])
+        except Exception as e:
+            print(f"YouTubeTranscriptApi nie może pobrać transkrypcji: {e}")
+            # Spróbuj użyć pytube jako alternatywy
+            try:
+                yt = YouTube(f'https://www.youtube.com/watch?v={video_id}')
+                captions = yt.captions
+                if captions:
+                    # Wybierz napisy w preferowanym języku
+                    caption = captions.get_by_language_code('pl') or captions.get_by_language_code('en')
+                    if caption:
+                        # Generuj napisy w formacie SRT
+                        srt_captions = caption.generate_srt_captions()
+                        # Konwertuj SRT do czystego tekstu
+                        transcript_text = self.srt_to_text(srt_captions)
+                    else:
+                        print("Napisy w wybranym języku nie są dostępne.")
+                else:
+                    print("Brak dostępnych napisów.")
+            except Exception as e:
+                print(f"pytube nie może pobrać transkrypcji: {e}")
+
+        if transcript_text:
+            # Zapisz transkrypcję w pamięci
+            self.transcriptions[video_id] = transcript_text
+            return transcript_text
+        else:
+            return None
+
+    def srt_to_text(self, srt_captions):
+        # Konwertuj napisy SRT do czystego tekstu
+        import re
+        lines = srt_captions.strip().split('\n')
+        text_lines = []
+        for line in lines:
+            # Pomijaj numery sekwencji i znaczniki czasu
+            if re.match(r'^\d+$', line) or re.match(r'^\d{2}:\d{2}:\d{2},\d{3}', line):
+                continue
+            else:
+                text_lines.append(line.strip())
+        # Połącz linie w jeden tekst
+        transcript_text = ' '.join(text_lines)
+        return transcript_text
+
+    def export_to_txt(self):
+        # Implementacja eksportu transkrypcji do plików TXT
+        output_dir = self.output_dir_input.text()
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+
+        total_items = self.video_list_widget.count()
+        for index in range(total_items):
+            item = self.video_list_widget.item(index)
+            video_id, publish_date, title = item.data(QtCore.Qt.UserRole)
+            if "📄" in item.text():  # Tylko jeśli transkrypcja jest dostępna
+                transcript = self.transcriptions.get(video_id, None)
+                if transcript is None:
+                    self.status_label.setText(f"Pobieranie transkrypcji dla wideo: {title}")
+                    QtCore.QCoreApplication.processEvents()
+                    transcript = self.download_transcription_synchronously(video_id)
+                if transcript is not None:
+                    filename = f"{publish_date} - {re.sub(r'[/*?\"<>|:]', '', title)}.txt"
+                    file_path = os.path.join(output_dir, filename)
+                    with open(file_path, "w", encoding="utf-8") as file:
+                        file.write(transcript)
+                    self.status_label.setText(f"Transkrypcja zapisana do pliku: {file_path}")
+                    QtCore.QCoreApplication.processEvents()
+        self.status_label.setText("Eksport transkrypcji do plików TXT zakończony.")
+
+    def export_to_json(self):
+        # Implementacja eksportu transkrypcji do pliku JSON
+        output_dir = self.output_dir_input.text()
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        json_data = {}
+        total_items = self.video_list_widget.count()
+        for index in range(total_items):
+            item = self.video_list_widget.item(index)
+            video_id, publish_date, title = item.data(QtCore.Qt.UserRole)
+            if "📄" in item.text():  # Tylko jeśli transkrypcja jest dostępna
+                transcript = self.transcriptions.get(video_id, None)
+                if transcript is None:
+                    self.status_label.setText(f"Pobieranie transkrypcji dla wideo: {title}")
+                    QtCore.QCoreApplication.processEvents()
+                    transcript = self.download_transcription_synchronously(video_id)
+                if transcript is not None:
+                    json_data[title] = {
+                        "video_id": video_id,
+                        "publish_date": publish_date,
+                        "transcript": transcript
+                    }
+                    self.status_label.setText(f"Transkrypcja dla wideo {title} dodana do JSON.")
+                    QtCore.QCoreApplication.processEvents()
+        json_file_path = os.path.join(output_dir, "transcripts.json")
+        with open(json_file_path, "w", encoding="utf-8") as json_file:
+            json.dump(json_data, json_file, indent=4, ensure_ascii=False)
+        self.status_label.setText(f"Transkrypcje zapisane do pliku JSON: {json_file_path}")
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
