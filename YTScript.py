@@ -1,16 +1,17 @@
 import sys
 import re
 import requests
+import json
 from pathlib import Path
+from dataclasses import dataclass
+from enum import Enum
+
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton,
     QLineEdit, QListWidget, QTextEdit, QWidget, QMessageBox, QFileDialog, QCheckBox, QStatusBar, QComboBox
 )
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api._errors import NoTranscriptFound, TranscriptsDisabled, VideoUnavailable
-import json
-from dataclasses import dataclass
-from enum import Enum
 
 
 @dataclass
@@ -84,9 +85,7 @@ class YouTubeTranscriptApp(QMainWindow):
 
     def setup_clean_options_ui(self):
         clean_options_layout = QHBoxLayout()
-        self.remove_filler_checkbox = QCheckBox("Usuń wtrącenia", stateChanged=self.update_transcript_viewer)
         self.remove_timestamps_checkbox = QCheckBox("Usuń znaczniki czasu", stateChanged=self.update_transcript_viewer)
-        clean_options_layout.addWidget(self.remove_filler_checkbox)
         clean_options_layout.addWidget(self.remove_timestamps_checkbox)
         self.layout.addLayout(clean_options_layout)
 
@@ -211,17 +210,6 @@ class YouTubeTranscriptApp(QMainWindow):
 
         transcript_text = "\n".join(
             [f"[{segment['start']:.2f}] {segment['text']}" for segment in self.current_transcript])
-
-        if self.remove_filler_checkbox.isChecked():
-            unwanted_phrases = [
-                "uhm", "eee", "aha", "[Muzyka]",
-                "eee", "yyy", "no", "hmm",
-                "um", "eh", "well", "okay", "y'know",
-                "muzyka", "music"
-            ]
-
-            for phrase in unwanted_phrases:
-                transcript_text = re.sub(re.escape(phrase), "", transcript_text, flags=re.IGNORECASE).strip()
 
         if self.remove_timestamps_checkbox.isChecked():
             transcript_text = re.sub(r'\[\d+\.\d{2}\]', '', transcript_text)
