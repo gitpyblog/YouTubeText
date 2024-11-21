@@ -2,8 +2,7 @@ import json
 import re
 import sys
 from dataclasses import dataclass
-from enum import Enum
-
+from enum import StrEnum
 import requests
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon
@@ -16,10 +15,10 @@ from youtube_transcript_api._errors import NoTranscriptFound, TranscriptsDisable
 
 @dataclass
 class TranscriptSegment:
-    start: float
-    text: str
+    start: float = 0.0
+    text: str = ""
 
-class FileType(Enum):
+class FileType(StrEnum):
     JSON = "json"
     TXT = "txt"
 
@@ -164,12 +163,8 @@ class YouTubeTranscriptApp(QMainWindow):
             transcripts = YouTubeTranscriptApi.list_transcripts(video_id)
             self.populate_transcripts_list(transcripts)
             self.status_bar.showMessage("Transkrypcje pobrane", 5000)
-        except VideoUnavailable:
-            self.display_message("Błąd: Wideo niedostępne.", error=True)
-        except NoTranscriptFound:
-            self.display_message("Błąd: Nie znaleziono transkrypcji.", error=True)
-        except TranscriptsDisabled:
-            self.display_message("Błąd: Transkrypcje wyłączone dla tego filmu.", error=True)
+        except (VideoUnavailable, NoTranscriptFound, TranscriptsDisabled) as e:
+            self.display_message(f"Błąd: {str(e)}", error=True)
         except Exception as e:
             self.display_message(f"Nieoczekiwany błąd: {str(e)}", error=True)
 
@@ -194,7 +189,7 @@ class YouTubeTranscriptApp(QMainWindow):
 
     def get_video_title(self, url):
         try:
-            response = requests.get(url)
+            response = requests.get(url, timeout=10)
             if response.status_code == 200:
                 title_match = re.search(r'<title>(.*?)</title>', response.text, re.IGNORECASE)
                 return title_match.group(1).replace(" - YouTube", "").strip() if title_match else None
@@ -205,25 +200,20 @@ class YouTubeTranscriptApp(QMainWindow):
         if not self.current_transcript:
             return
 
-        # Transkrypcja linia po linii
         transcript_lines = [
             f"[{segment['start']:.2f}] {segment['text']}"
             for segment in self.current_transcript
         ]
 
         if self.remove_timestamps_checkbox.isChecked():
-            cleaned_lines = []
-            for line in transcript_lines:
-                # Usuń znacznik czasu z każdej linii
-                line_without_timestamp = re.sub(r'\[\d+\.\d{2}\]', '', line)
-                # Usuń dodatkowe spacje i dodaj do listy
-                cleaned_lines.append(re.sub(r'\s+', ' ', line_without_timestamp).strip())
-
+            cleaned_lines = [
+                re.sub(r'\[\d+\.\d{2}\]', '', line).strip()
+                for line in transcript_lines
+            ]
             self.modified_transcript_text = "\n".join(cleaned_lines)
         else:
             self.modified_transcript_text = "\n".join(transcript_lines)
 
-        # Wyświetl przetworzoną transkrypcję
         self.transcript_viewer.setText(self.modified_transcript_text)
         self.status_bar.showMessage("Transkrypcja wyświetlona", 3000)
 
@@ -243,24 +233,23 @@ class YouTubeTranscriptApp(QMainWindow):
         except Exception as e:
             self.display_message(f"Nie udało się pobrać transkrypcji: {str(e)}", error=True)
 
-    def save_transcript(self, file_type: FileType):
+    def save_transcript(self, file_type: FileType | None) -> None:
         if not self.modified_transcript_text:
             self.display_message("Brak transkrypcji do zapisania.", error=True)
             return
 
         try:
-            # Użycie QFileDialog do wyboru ścieżki zapisu
             if file_type == FileType.JSON:
-                file_path, _ = QFileDialog.getSaveFileName(self, "Zapisz jako JSON", re.sub(r'[\\\\/:*?"<>|]', '', self.video_titles.get(self.video_queue[-1], 'transcript')) + ".json", "Pliki JSON (*.json)")
+                file_path, _ = QFileDialog.getSaveFileName(self, "Zapisz jako JSON", re.sub(r'[\\/:*?"<>|]', '', self.video_titles.get(self.video_queue[-1], 'transcript')) + ".json", "Pliki JSON (*.json)")
                 if not file_path:
-                    return  # użytkownik anulował zapis
+                    return
 
                 with open(file_path, "w", encoding="utf-8") as file:
                     json.dump(self.modified_transcript_text.split("\n"), file, indent=4, ensure_ascii=False)
             elif file_type == FileType.TXT:
-                file_path, _ = QFileDialog.getSaveFileName(self, "Zapisz jako TXT", re.sub(r'[\\\\/:*?"<>|]', '', self.video_titles.get(self.video_queue[-1], 'transcript')) + ".txt", "Pliki tekstowe (*.txt)")
+                file_path, _ = QFileDialog.getSaveFileName(self, "Zapisz jako TXT", re.sub(r'[\\/:*?"<>|]', '', self.video_titles.get(self.video_queue[-1], 'transcript')) + ".txt", "Pliki tekstowe (*.txt)")
                 if not file_path:
-                    return  # użytkownik anulował zapis
+                    return
 
                 with open(file_path, "w", encoding="utf-8") as file:
                     file.write(self.modified_transcript_text)
