@@ -96,6 +96,7 @@ class YouTubeTranscriptApp(QMainWindow):
         self.transcript_viewer = QTextEdit()
         self.transcript_viewer.setFixedHeight(300)
         self.transcript_viewer.setPlaceholderText("Brak treści transkrypcji")
+        self.transcript_viewer.setReadOnly(True)
         self.transcript_viewer.setStyleSheet(
             "border: none; font-family: 'Segoe UI'; font-size: 10pt; padding: 5px; scrollbar: QScrollBar:vertical { width: 10px; background: #f0f0f0; border-radius: 5px; } QScrollBar::handle:vertical { background: #888; border-radius: 5px; }")
         self.layout.addWidget(self.transcript_viewer)
