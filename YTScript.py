@@ -6,24 +6,22 @@ from pathlib import Path
 from dataclasses import dataclass
 from enum import Enum
 
-from PyQt5.QtWidgets import (
+from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton,
     QLineEdit, QListWidget, QTextEdit, QWidget, QMessageBox, QFileDialog, QCheckBox, QStatusBar, QComboBox
 )
+from PyQt6.QtCore import Qt
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api._errors import NoTranscriptFound, TranscriptsDisabled, VideoUnavailable
-
 
 @dataclass
 class TranscriptSegment:
     start: float
     text: str
 
-
 class FileType(Enum):
     JSON = "json"
     TXT = "txt"
-
 
 class YouTubeTranscriptApp(QMainWindow):
     def __init__(self):
@@ -53,11 +51,13 @@ class YouTubeTranscriptApp(QMainWindow):
 
     def setup_input_ui(self):
         input_layout = QHBoxLayout()
-        self.url_input = QLineEdit(placeholderText="Podaj link do filmu YouTube")
+        self.url_input = QLineEdit()
+        self.url_input.setPlaceholderText("Podaj link do filmu YouTube")
         self.url_input.setFixedHeight(50)
 
-        self.fetch_button = QPushButton("Dodaj do kolejki", clicked=self.add_to_queue)
+        self.fetch_button = QPushButton("Dodaj do kolejki")
         self.fetch_button.setFixedSize(200, 50)
+        self.fetch_button.clicked.connect(self.add_to_queue)
 
         input_layout.addWidget(self.url_input)
         input_layout.addWidget(self.fetch_button)
@@ -85,14 +85,19 @@ class YouTubeTranscriptApp(QMainWindow):
 
     def setup_clean_options_ui(self):
         clean_options_layout = QHBoxLayout()
-        self.remove_timestamps_checkbox = QCheckBox("Usuń znaczniki czasu", stateChanged=self.update_transcript_viewer)
+        self.remove_timestamps_checkbox = QCheckBox("Usuń znaczniki czasu")
+        self.remove_timestamps_checkbox.stateChanged.connect(self.update_transcript_viewer)
         clean_options_layout.addWidget(self.remove_timestamps_checkbox)
         self.layout.addLayout(clean_options_layout)
 
     def setup_save_buttons_ui(self):
         save_buttons_layout = QHBoxLayout()
-        self.save_json_button = QPushButton("Zapisz jako JSON", clicked=lambda: self.save_transcript(FileType.JSON))
-        self.save_txt_button = QPushButton("Zapisz jako TXT", clicked=lambda: self.save_transcript(FileType.TXT))
+        self.save_json_button = QPushButton("Zapisz jako JSON")
+        self.save_json_button.setFixedSize(200, 50)
+        self.save_json_button.clicked.connect(lambda: self.save_transcript(FileType.JSON))
+        self.save_txt_button = QPushButton("Zapisz jako TXT")
+        self.save_txt_button.setFixedSize(200, 50)
+        self.save_txt_button.clicked.connect(lambda: self.save_transcript(FileType.TXT))
         save_buttons_layout.addWidget(self.save_json_button)
         save_buttons_layout.addWidget(self.save_txt_button)
         self.layout.addLayout(save_buttons_layout)
@@ -233,7 +238,6 @@ class YouTubeTranscriptApp(QMainWindow):
             self.status_bar.showMessage("Transkrypcja wyświetlona", 5000)
         except Exception as e:
             self.display_message(f"Nie udało się pobrać transkrypcji: {str(e)}", error=True)
-
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
