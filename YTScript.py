@@ -1,3 +1,4 @@
+import json
 import re
 import sys
 from dataclasses import dataclass
@@ -13,24 +14,20 @@ from PyQt6.QtWidgets import (
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api._errors import NoTranscriptFound, TranscriptsDisabled, VideoUnavailable
 
-
 @dataclass
 class TranscriptSegment:
     start: float
     text: str
 
-
 class FileType(Enum):
     JSON = "json"
     TXT = "txt"
-
 
 class StyledButton(QPushButton):
     def __init__(self, text, parent=None):
         super().__init__(text, parent)
         self.setFixedSize(200, 50)
         self.setStyleSheet("font-family: 'Segoe UI'; font-size: 12pt; padding: 5px;")
-
 
 class YouTubeTranscriptApp(QMainWindow):
     def __init__(self):
@@ -59,6 +56,7 @@ class YouTubeTranscriptApp(QMainWindow):
 
     def initialize_data(self):
         self.current_transcript = None
+        self.modified_transcript_text = ""
         self.video_queue = []
         self.video_titles = {}
 
@@ -117,9 +115,9 @@ class YouTubeTranscriptApp(QMainWindow):
         save_buttons_layout.setContentsMargins(10, 10, 10, 10)
         save_buttons_layout.setSpacing(10)
         self.save_json_button = StyledButton("Zapisz jako JSON")
-        )
         self.save_txt_button = StyledButton("Zapisz jako TXT")
-        )
+        self.save_json_button.clicked.connect(lambda: self.save_transcript(FileType.JSON))
+        self.save_txt_button.clicked.connect(lambda: self.save_transcript(FileType.TXT))
         save_buttons_layout.addWidget(self.save_json_button)
         save_buttons_layout.addWidget(self.save_txt_button)
         self.layout.addLayout(save_buttons_layout)
@@ -221,12 +219,12 @@ class YouTubeTranscriptApp(QMainWindow):
                 # Usuń dodatkowe spacje i dodaj do listy
                 cleaned_lines.append(re.sub(r'\s+', ' ', line_without_timestamp).strip())
 
-            transcript_text = "\n".join(cleaned_lines)
+            self.modified_transcript_text = "\n".join(cleaned_lines)
         else:
-            transcript_text = "\n".join(transcript_lines)
+            self.modified_transcript_text = "\n".join(transcript_lines)
 
         # Wyświetl przetworzoną transkrypcję
-        self.transcript_viewer.setText(transcript_text)
+        self.transcript_viewer.setText(self.modified_transcript_text)
         self.status_bar.showMessage("Transkrypcja wyświetlona", 3000)
 
     def display_transcript(self):
@@ -245,11 +243,27 @@ class YouTubeTranscriptApp(QMainWindow):
         except Exception as e:
             self.display_message(f"Nie udało się pobrać transkrypcji: {str(e)}", error=True)
 
+    def save_transcript(self, file_type: FileType):
+        if not self.modified_transcript_text:
+            self.display_message("Brak transkrypcji do zapisania.", error=True)
+            return
+
+        try:
+            if file_type == FileType.JSON:
+                file_path = "transcript.json"
+                with open(file_path, "w", encoding="utf-8") as file:
+                    json.dump(self.modified_transcript_text.split("\n"), file, indent=4, ensure_ascii=False)
+            elif file_type == FileType.TXT:
+                file_path = "transcript.txt"
+                with open(file_path, "w", encoding="utf-8") as file:
+                    file.write(self.modified_transcript_text)
+
+            self.display_message(f"Transkrypcja zapisana jako {file_type.value.upper()}.")
+        except Exception as e:
+            self.display_message(f"Nie udało się zapisać pliku: {str(e)}", error=True)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = YouTubeTranscriptApp()
     window.show()
     sys.exit(app.exec())
-
-# GitHub repository: https://github.com
