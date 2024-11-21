@@ -133,9 +133,12 @@ class YouTubeTranscriptApp(QMainWindow):
             transcripts = YouTubeTranscriptApi.list_transcripts(video_id)
             self.populate_transcripts_list(transcripts)
             self.status_bar.showMessage("Transkrypcje pobrane", 5000)
-        except (VideoUnavailable, NoTranscriptFound, TranscriptsDisabled) as e:
-            self.display_message(f"Błąd: {str(e)}", error=True)
-            self.display_message("Brak dostępnych transkrypcji dla tego filmu.", error=True)
+        except VideoUnavailable:
+            self.display_message("Błąd: Wideo niedostępne.", error=True)
+        except NoTranscriptFound:
+            self.display_message("Błąd: Nie znaleziono transkrypcji.", error=True)
+        except TranscriptsDisabled:
+            self.display_message("Błąd: Transkrypcje wyłączone dla tego filmu.", error=True)
         except Exception as e:
             self.display_message(f"Nieoczekiwany błąd: {str(e)}", error=True)
 
@@ -162,14 +165,20 @@ class YouTubeTranscriptApp(QMainWindow):
         options = QFileDialog.Options()
         file_filter = "Plik JSON (*.json)" if file_type == FileType.JSON else "Plik TXT (*.txt)"
 
-        current_video_id = self.video_queue[self.video_queue_list.currentRow()]
+        current_row = self.video_queue_list.currentRow()
+        if current_row == -1:
+            self.display_message("Nie wybrano żadnego filmu do zapisania.", error=True)
+            return
+
+        current_video_id = self.video_queue[current_row]
         default_file_name = self.video_titles.get(current_video_id, "transkrypcja")
 
         file_path, _ = QFileDialog.getSaveFileName(self, "Zapisz plik", f"{default_file_name}", file_filter,
                                                    options=options)
-        file_path = Path(file_path)
         if not file_path:
             return
+
+        file_path = Path(file_path)
 
         try:
             if file_type == FileType.JSON:
