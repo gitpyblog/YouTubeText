@@ -9,30 +9,89 @@ from PyQt6.QtGui import QIcon, QDesktopServices, QFont
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton,
     QLineEdit, QListWidget, QTextEdit, QWidget, QMessageBox, QCheckBox, QStatusBar, QComboBox, QLabel, QFileDialog,
-    QListWidgetItem, QHBoxLayout
+    QListWidgetItem
 )
 from PyQt6.QtCore import QUrl
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api._errors import NoTranscriptFound, TranscriptsDisabled, VideoUnavailable
-
 
 @dataclass
 class TranscriptSegment:
     start: float = 0.0
     text: str = ""
 
-
 class FileType(StrEnum):
     JSON = "json"
     TXT = "txt"
 
+def set_widget_style(widget, font_family='Segoe UI', font_size=10, padding=0, margin=0, border='none', height=None):
+    style = f"font-family: '{font_family}'; font-size: {font_size}pt; padding: {padding}px; margin: {margin}px; border: {border}"
+    if height:
+        style += f"; min-height: {height}px; max-height: {height}px"
+    widget.setStyleSheet(style)
+
+def create_standard_layout():
+    layout = QHBoxLayout()
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.setSpacing(0)  # Zmniejszenie odstępu do minimum
+    return layout
+
+def create_video_widget(title, url):
+    widget = QWidget()
+    layout = QHBoxLayout()
+    layout.setContentsMargins(0, 0, 0, 0)  # Zmniejszenie marginesów do minimum
+    layout.setSpacing(0)  # Zmniejszenie odstępu do minimum
+    layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)  # Ustawienie wyrównania układu w pionie na środek
+
+    title_label = QLabel(title)
+    title_font = QFont()
+    title_font.setBold(True)
+    title_label.setFont(title_font)
+    set_widget_style(title_label, font_size=10, height=30, margin='3px 0')  # Ujednolicenie wysokości, stylu i paddingu
+
+    url_label = QLabel(f"<a href=\"{url}\" style=\"text-decoration: none;\">{url}</a>")
+    url_font = QFont()
+    url_font.setPointSize(10)
+    url_label.setFont(url_font)
+
+    url_label.setTextFormat(Qt.TextFormat.RichText)
+    url_label.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
+    url_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
+    url_label.setOpenExternalLinks(True)
+    set_widget_style(url_label, font_size=10, height=30, margin='3px 0')  # Ujednolicenie wysokości, stylu i paddingu
+
+    layout.addWidget(title_label)
+    layout.addWidget(url_label, alignment=Qt.AlignmentFlag.AlignLeft)
+    widget.setLayout(layout)
+
+    return widget
 
 class StyledButton(QPushButton):
     def __init__(self, text, parent=None):
         super().__init__(text, parent)
-        self.setFixedSize(200, 50)
-        self.setStyleSheet("font-family: 'Segoe UI'; font-size: 12pt; padding: 5px;")
-
+        self.setFixedSize(200, 60)
+        style = """
+            QPushButton {
+                font-family: 'Segoe UI';
+                font-size: 12pt;
+                padding: 10px;
+                margin: 5px;
+                border: none;
+                border-radius: 0px;
+                background-color: #ffffff;
+                color: #000;
+                box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.2), -5px -5px 15px rgba(255, 255, 255, 0.8);
+            }
+            QPushButton:hover {
+                background-color: #f0f0f0;
+                box-shadow: 3px 3px 10px rgba(0, 0, 0, 0.15), -3px -3px 10px rgba(255, 255, 255, 0.7);
+            }
+            QPushButton:pressed {
+                background-color: #e0e0e0;
+                box-shadow: inset 5px 5px 15px rgba(0, 0, 0, 0.2), inset -5px -5px 15px rgba(255, 255, 255, 0.8);
+            }
+        """
+        self.setStyleSheet(style)
 
 class YouTubeTranscriptApp(QMainWindow):
     def __init__(self):
@@ -66,14 +125,13 @@ class YouTubeTranscriptApp(QMainWindow):
         self.video_titles = {}
 
     def setup_input_ui(self):
-        input_layout = QHBoxLayout()
+        input_layout = create_standard_layout()
         input_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
-        input_layout.setContentsMargins(0, 10, 0, 10)
-        input_layout.setSpacing(10)
+
         self.url_input = QLineEdit()
         self.url_input.setPlaceholderText("Podaj link do filmu YouTube")
         self.url_input.setFixedHeight(50)
-        self.url_input.setStyleSheet("font-family: 'Segoe UI'; font-size: 12pt; padding: 5px; border: none")
+        set_widget_style(self.url_input, font_size=12, padding=10)
 
         self.fetch_button = StyledButton("Dodaj do kolejki")
         self.fetch_button.clicked.connect(self.add_to_queue)
@@ -85,7 +143,31 @@ class YouTubeTranscriptApp(QMainWindow):
     def setup_queue_ui(self):
         self.video_queue_list = QListWidget()
         self.video_queue_list.setFixedHeight(150)
-        self.video_queue_list.setStyleSheet("font-family: 'Segoe UI'; font-size: 10pt; padding: 5px;")
+        set_widget_style(self.video_queue_list, font_size=10)
+
+        scrollbar_style = """
+            QScrollBar:vertical {
+                border: none;
+                background: #ffffff;
+                width: 14px;
+                margin: 0px;
+            }
+            QScrollBar::handle:vertical {
+                background: #e0e0e0;
+                min-height: 30px;
+                border-radius: 0px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: #c0c0c0;
+            }
+            QScrollBar::handle:vertical:pressed {
+                background: #a0a0a0;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+        """
+        self.video_queue_list.verticalScrollBar().setStyleSheet(scrollbar_style)
 
         self.video_queue_list.addItem("Brak filmów w kolejce")
         self.video_queue_list.itemClicked.connect(self.handle_item_click)
@@ -94,7 +176,30 @@ class YouTubeTranscriptApp(QMainWindow):
     def setup_transcript_ui(self):
         self.transcripts_list = QComboBox()
         self.transcripts_list.setFixedHeight(50)
-        self.transcripts_list.setStyleSheet("font-family: 'Segoe UI'; font-size: 10pt; padding: 5px;")
+        style = """
+            QComboBox {
+                font-family: 'Segoe UI';
+                font-size: 10pt;
+                padding: 10px;
+                margin: 3px 0;
+                border: none;
+                border-radius: 0px;
+                background-color: #ffffff;
+                color: #000;
+                box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.2), -5px -5px 15px rgba(255, 255, 255, 0.8);
+            }
+            QComboBox:hover {
+                background-color: #f0f0f0;
+                box-shadow: 3px 3px 10px rgba(0, 0, 0, 0.15), -3px -3px 10px rgba(255, 255, 255, 0.7);
+            }
+            QComboBox::drop-down {
+                border: none;
+                background-color: transparent;
+            }
+
+        """
+
+        self.transcripts_list.setStyleSheet(style)
         self.transcripts_list.addItem("Brak dostępnych transkrypcji")
         self.transcripts_list.currentIndexChanged.connect(self.display_transcript)
         self.layout.addWidget(self.transcripts_list)
@@ -103,24 +208,65 @@ class YouTubeTranscriptApp(QMainWindow):
         self.transcript_viewer.setFixedHeight(300)
         self.transcript_viewer.setPlaceholderText("Brak treści transkrypcji")
         self.transcript_viewer.setReadOnly(True)
-        self.transcript_viewer.setStyleSheet(
-            "border: none; font-family: 'Segoe UI'; font-size: 10pt; padding: 5px; border: none; scrollbar: QScrollBar:vertical { width: 10px; background: #f0f0f0; border-radius: 5px; } QScrollBar::handle:vertical { background: #888; border-radius: 5px; }")
+        set_widget_style(self.transcript_viewer, font_size=10, border='none')
+
+        scrollbar_style = """
+            QScrollBar:vertical {
+                border: none;
+                background: #ffffff;
+                width: 14px;
+                margin: 0px;
+            }
+            QScrollBar::handle:vertical {
+                background: #e0e0e0;
+                min-height: 30px;
+                border-radius: 0px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: #c0c0c0;
+            }
+            QScrollBar::handle:vertical:pressed {
+                background: #a0a0a0;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+        """
+        self.transcript_viewer.verticalScrollBar().setStyleSheet(scrollbar_style)
+
         self.layout.addWidget(self.transcript_viewer)
 
     def setup_clean_options_ui(self):
-        clean_options_layout = QHBoxLayout()
-        clean_options_layout.setContentsMargins(10, 10, 10, 10)
-        clean_options_layout.setSpacing(10)
+        clean_options_layout = create_standard_layout()
         self.remove_timestamps_checkbox = QCheckBox("Usuń znaczniki czasu")
-        self.remove_timestamps_checkbox.setStyleSheet("font-family: 'Segoe UI'; font-size: 10pt; padding: 5px;")
+        style = """
+            QCheckBox {
+                font-family: 'Segoe UI';
+                font-size: 10pt;
+                padding: 10px;
+                margin: 5px;
+                border: none;
+                border-radius: 0px;
+                color: #000;
+            }
+            QCheckBox::indicator {
+                width: 20px;
+                height: 20px;
+                border-radius: 0px;
+                background-color: #ffffff;
+
+            }
+            QCheckBox::indicator:checked {
+                background-color: #e0e0e0;
+            }
+        """
+        self.remove_timestamps_checkbox.setStyleSheet(style)
         self.remove_timestamps_checkbox.stateChanged.connect(self.update_transcript_viewer)
         clean_options_layout.addWidget(self.remove_timestamps_checkbox)
         self.layout.addLayout(clean_options_layout)
 
     def setup_save_buttons_ui(self):
-        save_buttons_layout = QHBoxLayout()
-        save_buttons_layout.setContentsMargins(10, 10, 10, 10)
-        save_buttons_layout.setSpacing(10)
+        save_buttons_layout = create_standard_layout()
         self.save_json_button = StyledButton("Zapisz jako JSON")
         self.save_txt_button = StyledButton("Zapisz jako TXT")
         self.save_json_button.clicked.connect(lambda: self.save_transcript(FileType.JSON))
@@ -131,7 +277,7 @@ class YouTubeTranscriptApp(QMainWindow):
 
     def setup_status_bar(self):
         self.status_bar = QStatusBar()
-        self.status_bar.setStyleSheet("font-family: 'Segoe UI'; font-size: 10pt; padding: 5px;")
+        set_widget_style(self.status_bar, font_size=10)
         self.setStatusBar(self.status_bar)
 
     def setup_github_link(self):
@@ -141,7 +287,7 @@ class YouTubeTranscriptApp(QMainWindow):
             f'<a href="{github_url}" style="text-decoration: none; color: grey;">Repozytorium GitHub</a>')
         self.github_link.setOpenExternalLinks(True)
         self.github_link.setAlignment(Qt.AlignmentFlag.AlignRight)
-        self.github_link.setStyleSheet("padding: 5px;")
+        set_widget_style(self.github_link, padding=5)
         self.status_bar.addPermanentWidget(self.github_link)
 
     def add_to_queue(self):
@@ -157,40 +303,13 @@ class YouTubeTranscriptApp(QMainWindow):
         if self.video_queue_list.count() == 1 and self.video_queue_list.item(0).text() == "Brak filmów w kolejce":
             self.video_queue_list.clear()
 
-        # Tworzenie niestandardowego widgetu, aby sformatować tytuł i URL
-        widget = QWidget()
-        layout = QHBoxLayout()
-
-        # Pogrubiony tytuł filmu
-        title_label = QLabel(video_title)
-        title_font = QFont()
-        title_font.setBold(True)
-        title_label.setFont(title_font)
-
-        # Klikalny URL filmu (bez pogrubienia i bez podkreślenia)
-        url_label = QLabel(f"<a href=\"{video_url}\" style=\"text-decoration: none;\">{video_url}</a>")
-        url_label.setTextFormat(Qt.TextFormat.RichText)
-        url_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
-        url_label.setOpenExternalLinks(True)
-
-        # Dodanie tytułu i URL do układu
-        layout.addWidget(title_label)
-        layout.addWidget(url_label)
-        widget.setLayout(layout)
-
-        # Ustawienie większej wysokości widgetu, aby dostosować go do większej czcionki
-        widget.setFixedHeight(50)
-
-        # Dodanie elementu do listy jako QListWidgetItem
+        widget = create_video_widget(video_title, video_url)
         item = QListWidgetItem()
         item.setSizeHint(widget.sizeHint())
         self.video_queue_list.addItem(item)
         self.video_queue_list.setItemWidget(item, widget)
 
-        # Przechowywanie video_id jako właściwość elementu listy
         item.setData(Qt.ItemDataRole.UserRole, video_id)
-
-        # Przechowywanie video_id
         self.video_queue.append(video_id)
         self.url_input.clear()
         self.display_message("Film dodany do kolejki")
@@ -310,7 +429,6 @@ class YouTubeTranscriptApp(QMainWindow):
             self.display_message(f"Transkrypcja zapisana jako {file_type.value.upper()}.")
         except Exception as e:
             self.display_message(f"Nie udało się zapisać pliku: {str(e)}", error=True)
-
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
