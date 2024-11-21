@@ -332,7 +332,9 @@ class YouTubeTranscriptApp(QMainWindow):
         save_buttons_layout.setSpacing(5)  # Dodaj odstęp między przyciskami
 
         self.save_json_button = StyledButton("Zapisz jako JSON")
+        self.save_json_button.clicked.connect(lambda: self.save_transcript(FileType.JSON))
         self.save_txt_button = StyledButton("Zapisz jako TXT")
+        self.save_txt_button.clicked.connect(lambda: self.save_transcript(FileType.TXT))
 
         # Dodaj przyciski do layoutu i ustaw rozciąganie, aby wypełnić szerokość
         save_buttons_layout.addWidget(self.save_json_button)
