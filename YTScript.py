@@ -8,26 +8,31 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon, QDesktopServices, QFont
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton,
-    QLineEdit, QListWidget, QTextEdit, QWidget, QMessageBox, QCheckBox, QStatusBar, QComboBox, QLabel, QFileDialog, QListWidgetItem, QHBoxLayout
+    QLineEdit, QListWidget, QTextEdit, QWidget, QMessageBox, QCheckBox, QStatusBar, QComboBox, QLabel, QFileDialog,
+    QListWidgetItem, QHBoxLayout
 )
 from PyQt6.QtCore import QUrl
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api._errors import NoTranscriptFound, TranscriptsDisabled, VideoUnavailable
+
 
 @dataclass
 class TranscriptSegment:
     start: float = 0.0
     text: str = ""
 
+
 class FileType(StrEnum):
     JSON = "json"
     TXT = "txt"
+
 
 class StyledButton(QPushButton):
     def __init__(self, text, parent=None):
         super().__init__(text, parent)
         self.setFixedSize(200, 50)
         self.setStyleSheet("font-family: 'Segoe UI'; font-size: 12pt; padding: 5px;")
+
 
 class YouTubeTranscriptApp(QMainWindow):
     def __init__(self):
@@ -62,6 +67,7 @@ class YouTubeTranscriptApp(QMainWindow):
 
     def setup_input_ui(self):
         input_layout = QHBoxLayout()
+        input_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
         input_layout.setContentsMargins(0, 10, 0, 10)
         input_layout.setSpacing(10)
         self.url_input = QLineEdit()
@@ -82,7 +88,7 @@ class YouTubeTranscriptApp(QMainWindow):
         self.video_queue_list.setStyleSheet("font-family: 'Segoe UI'; font-size: 10pt; padding: 5px;")
 
         self.video_queue_list.addItem("Brak filmów w kolejce")
-        self.video_queue_list.itemClicked.connect(self.fetch_transcripts_from_queue)
+        self.video_queue_list.itemClicked.connect(self.handle_item_click)
         self.layout.addWidget(self.video_queue_list)
 
     def setup_transcript_ui(self):
@@ -131,7 +137,8 @@ class YouTubeTranscriptApp(QMainWindow):
     def setup_github_link(self):
         self.github_link = QLabel()
         github_url = "https://github.com/gitpyblog/YouTubeText"
-        self.github_link.setText(f'<a href="{github_url}" style="text-decoration: none; color: grey;">Repozytorium GitHub</a>')
+        self.github_link.setText(
+            f'<a href="{github_url}" style="text-decoration: none; color: grey;">Repozytorium GitHub</a>')
         self.github_link.setOpenExternalLinks(True)
         self.github_link.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.github_link.setStyleSheet("padding: 5px;")
@@ -153,8 +160,6 @@ class YouTubeTranscriptApp(QMainWindow):
         # Tworzenie niestandardowego widgetu, aby sformatować tytuł i URL
         widget = QWidget()
         layout = QHBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(5)
 
         # Pogrubiony tytuł filmu
         title_label = QLabel(video_title)
@@ -162,8 +167,11 @@ class YouTubeTranscriptApp(QMainWindow):
         title_font.setBold(True)
         title_label.setFont(title_font)
 
-        # URL filmu (bez pogrubienia)
-        url_label = QLabel(f"({video_url})")
+        # Klikalny URL filmu (bez pogrubienia i bez podkreślenia)
+        url_label = QLabel(f"<a href=\"{video_url}\" style=\"text-decoration: none;\">{video_url}</a>")
+        url_label.setTextFormat(Qt.TextFormat.RichText)
+        url_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
+        url_label.setOpenExternalLinks(True)
 
         # Dodanie tytułu i URL do układu
         layout.addWidget(title_label)
@@ -171,23 +179,30 @@ class YouTubeTranscriptApp(QMainWindow):
         widget.setLayout(layout)
 
         # Ustawienie większej wysokości widgetu, aby dostosować go do większej czcionki
-        widget.setFixedHeight(40)
+        widget.setFixedHeight(50)
 
         # Dodanie elementu do listy jako QListWidgetItem
-        item = QListWidgetItem(self.video_queue_list)
+        item = QListWidgetItem()
+        item.setSizeHint(widget.sizeHint())
+        self.video_queue_list.addItem(item)
         self.video_queue_list.setItemWidget(item, widget)
+
+        # Przechowywanie video_id jako właściwość elementu listy
+        item.setData(Qt.ItemDataRole.UserRole, video_id)
 
         # Przechowywanie video_id
         self.video_queue.append(video_id)
         self.url_input.clear()
         self.display_message("Film dodany do kolejki")
 
-    def fetch_transcripts_from_queue(self, item):
-        if item.text() == "Brak filmów w kolejce":
-            return
+    def handle_item_click(self, item):
+        video_id = item.data(Qt.ItemDataRole.UserRole)
+        if video_id:
+            self.fetch_transcripts_from_queue(video_id)
 
-        video_index = self.video_queue_list.row(item)
-        video_id = self.video_queue[video_index]
+    def fetch_transcripts_from_queue(self, video_id):
+        if not video_id:
+            return
         try:
             self.status_bar.showMessage("Pobieranie transkrypcji...", 2000)
             transcripts = YouTubeTranscriptApi.list_transcripts(video_id)
@@ -270,14 +285,22 @@ class YouTubeTranscriptApp(QMainWindow):
 
         try:
             if file_type == FileType.JSON:
-                file_path, _ = QFileDialog.getSaveFileName(self, "Zapisz jako JSON", re.sub(r'[\\/:*?"<>|]', '', self.video_titles.get(self.video_queue[-1], 'transcript')) + ".json", "Pliki JSON (*.json)")
+                file_path, _ = QFileDialog.getSaveFileName(self, "Zapisz jako JSON", re.sub(r'[\\/:*?"<>|]', '',
+                                                                                            self.video_titles.get(
+                                                                                                self.video_queue[-1],
+                                                                                                'transcript')) + ".json",
+                                                           "Pliki JSON (*.json)")
                 if not file_path:
                     return
 
                 with open(file_path, "w", encoding="utf-8") as file:
                     json.dump(self.modified_transcript_text.split("\n"), file, indent=4, ensure_ascii=False)
             elif file_type == FileType.TXT:
-                file_path, _ = QFileDialog.getSaveFileName(self, "Zapisz jako TXT", re.sub(r'[\\/:*?"<>|]', '', self.video_titles.get(self.video_queue[-1], 'transcript')) + ".txt", "Pliki tekstowe (*.txt)")
+                file_path, _ = QFileDialog.getSaveFileName(self, "Zapisz jako TXT", re.sub(r'[\\/:*?"<>|]', '',
+                                                                                           self.video_titles.get(
+                                                                                               self.video_queue[-1],
+                                                                                               'transcript')) + ".txt",
+                                                           "Pliki tekstowe (*.txt)")
                 if not file_path:
                     return
 
@@ -287,6 +310,7 @@ class YouTubeTranscriptApp(QMainWindow):
             self.display_message(f"Transkrypcja zapisana jako {file_type.value.upper()}.")
         except Exception as e:
             self.display_message(f"Nie udało się zapisać pliku: {str(e)}", error=True)
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
