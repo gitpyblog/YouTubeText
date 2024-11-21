@@ -5,10 +5,10 @@ from dataclasses import dataclass
 from enum import StrEnum
 import requests
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QIcon, QDesktopServices
+from PyQt6.QtGui import QIcon, QDesktopServices, QFont
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton,
-    QLineEdit, QListWidget, QTextEdit, QWidget, QMessageBox, QCheckBox, QStatusBar, QComboBox, QLabel, QFileDialog
+    QLineEdit, QListWidget, QTextEdit, QWidget, QMessageBox, QCheckBox, QStatusBar, QComboBox, QLabel, QFileDialog, QListWidgetItem, QHBoxLayout
 )
 from PyQt6.QtCore import QUrl
 from youtube_transcript_api import YouTubeTranscriptApi
@@ -67,7 +67,7 @@ class YouTubeTranscriptApp(QMainWindow):
         self.url_input = QLineEdit()
         self.url_input.setPlaceholderText("Podaj link do filmu YouTube")
         self.url_input.setFixedHeight(50)
-        self.url_input.setStyleSheet("font-family: 'Segoe UI'; font-size: 12pt; padding: 5px; border: none;")
+        self.url_input.setStyleSheet("font-family: 'Segoe UI'; font-size: 12pt; padding: 5px; border: none")
 
         self.fetch_button = StyledButton("Dodaj do kolejki")
         self.fetch_button.clicked.connect(self.add_to_queue)
@@ -98,7 +98,7 @@ class YouTubeTranscriptApp(QMainWindow):
         self.transcript_viewer.setPlaceholderText("Brak treści transkrypcji")
         self.transcript_viewer.setReadOnly(True)
         self.transcript_viewer.setStyleSheet(
-            "border: none; font-family: 'Segoe UI'; font-size: 10pt; padding: 5px; scrollbar: QScrollBar:vertical { width: 10px; background: #f0f0f0; border-radius: 5px; } QScrollBar::handle:vertical { background: #888; border-radius: 5px; }")
+            "border: none; font-family: 'Segoe UI'; font-size: 10pt; padding: 5px; border: none; scrollbar: QScrollBar:vertical { width: 10px; background: #f0f0f0; border-radius: 5px; } QScrollBar::handle:vertical { background: #888; border-radius: 5px; }")
         self.layout.addWidget(self.transcript_viewer)
 
     def setup_clean_options_ui(self):
@@ -150,8 +150,35 @@ class YouTubeTranscriptApp(QMainWindow):
         if self.video_queue_list.count() == 1 and self.video_queue_list.item(0).text() == "Brak filmów w kolejce":
             self.video_queue_list.clear()
 
+        # Tworzenie niestandardowego widgetu, aby sformatować tytuł i URL
+        widget = QWidget()
+        layout = QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(5)
+
+        # Pogrubiony tytuł filmu
+        title_label = QLabel(video_title)
+        title_font = QFont()
+        title_font.setBold(True)
+        title_label.setFont(title_font)
+
+        # URL filmu (bez pogrubienia)
+        url_label = QLabel(f"({video_url})")
+
+        # Dodanie tytułu i URL do układu
+        layout.addWidget(title_label)
+        layout.addWidget(url_label)
+        widget.setLayout(layout)
+
+        # Ustawienie większej wysokości widgetu, aby dostosować go do większej czcionki
+        widget.setFixedHeight(40)
+
+        # Dodanie elementu do listy jako QListWidgetItem
+        item = QListWidgetItem(self.video_queue_list)
+        self.video_queue_list.setItemWidget(item, widget)
+
+        # Przechowywanie video_id
         self.video_queue.append(video_id)
-        self.video_queue_list.addItem(f"{video_title} ({video_url})")
         self.url_input.clear()
         self.display_message("Film dodany do kolejki")
 
