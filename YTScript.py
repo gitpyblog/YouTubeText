@@ -188,7 +188,13 @@ class YouTubeTranscriptApp(QMainWindow):
 
         # Apply cleaning based on checkboxes
         if self.remove_filler_checkbox.isChecked():
-            unwanted_phrases = ["uhm", "eee", "no więc", "[Muzyka]"]
+            unwanted_phrases = [
+                "uhm", "eee", "aha", "[Muzyka]",
+                "eee", "yyy", "no", "hmm",
+                "um", "eh", "well", "okay", "y'know",
+                "muzyka", "music"
+            ]
+
             for phrase in unwanted_phrases:
                 transcript_text = re.sub(re.escape(phrase), "", transcript_text, flags=re.IGNORECASE).strip()
 
