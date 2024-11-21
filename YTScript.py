@@ -1,34 +1,36 @@
-import sys
 import re
-import requests
-import json
-from pathlib import Path
+import sys
 from dataclasses import dataclass
 from enum import Enum
 
+import requests
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton,
-    QLineEdit, QListWidget, QTextEdit, QWidget, QMessageBox, QFileDialog, QCheckBox, QStatusBar, QComboBox, QLabel
+    QLineEdit, QListWidget, QTextEdit, QWidget, QMessageBox, QCheckBox, QStatusBar, QComboBox, QLabel
 )
-from PyQt6.QtGui import QIcon, QFont
-from PyQt6.QtCore import Qt
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api._errors import NoTranscriptFound, TranscriptsDisabled, VideoUnavailable
+
 
 @dataclass
 class TranscriptSegment:
     start: float
     text: str
 
+
 class FileType(Enum):
     JSON = "json"
     TXT = "txt"
+
 
 class StyledButton(QPushButton):
     def __init__(self, text, parent=None):
         super().__init__(text, parent)
         self.setFixedSize(200, 50)
         self.setStyleSheet("font-family: 'Segoe UI'; font-size: 12pt; padding: 5px;")
+
 
 class YouTubeTranscriptApp(QMainWindow):
     def __init__(self):
@@ -96,7 +98,8 @@ class YouTubeTranscriptApp(QMainWindow):
         self.transcript_viewer = QTextEdit()
         self.transcript_viewer.setFixedHeight(300)
         self.transcript_viewer.setPlaceholderText("Brak treści transkrypcji")
-        self.transcript_viewer.setStyleSheet("border: none; font-family: 'Segoe UI'; font-size: 10pt; padding: 5px; scrollbar: QScrollBar:vertical { width: 10px; background: #f0f0f0; border-radius: 5px; } QScrollBar::handle:vertical { background: #888; border-radius: 5px; }")
+        self.transcript_viewer.setStyleSheet(
+            "border: none; font-family: 'Segoe UI'; font-size: 10pt; padding: 5px; scrollbar: QScrollBar:vertical { width: 10px; background: #f0f0f0; border-radius: 5px; } QScrollBar::handle:vertical { background: #888; border-radius: 5px; }")
         self.layout.addWidget(self.transcript_viewer)
 
     def setup_clean_options_ui(self):
@@ -186,43 +189,6 @@ class YouTubeTranscriptApp(QMainWindow):
             QMessageBox.critical(self, "Błąd", message)
         self.status_bar.showMessage(message, 7000)
 
-    def save_transcript(self, file_type: FileType):
-        if not self.current_transcript:
-            self.display_message("Najpierw wybierz transkrypcję do zapisania.", error=True)
-            return
-
-        transcript_text = self.transcript_viewer.toPlainText()
-        options = QFileDialog.Options()
-        file_filter = "Plik JSON (*.json)" if file_type == FileType.JSON else "Plik TXT (*.txt)"
-
-        current_row = self.video_queue_list.currentRow()
-        if current_row == -1:
-            self.display_message("Nie wybrano żadnego filmu do zapisania.", error=True)
-            return
-
-        current_video_id = self.video_queue[current_row]
-        default_file_name = self.video_titles.get(current_video_id, "transkrypcja")
-
-        file_path, _ = QFileDialog.getSaveFileName(self, "Zapisz plik", f"{default_file_name}", file_filter,
-                                                   options=options)
-        if not file_path:
-            return
-
-        file_path = Path(file_path)
-
-        try:
-            if file_type == FileType.JSON:
-                transcript_data = [TranscriptSegment(segment['start'], segment['text']).__dict__ for segment in
-                                   self.current_transcript]
-                with file_path.open("w", encoding="utf-8") as file:
-                    json.dump(transcript_data, file, ensure_ascii=False, indent=4)
-            elif file_type == FileType.TXT:
-                with open(file_path, "w", encoding="utf-8") as file:
-                    file.write(transcript_text)
-            self.display_message(f"Plik został zapisany jako {file_path}")
-        except Exception as e:
-            self.display_message(f"Nie udało się zapisać pliku: {str(e)}", error=True)
-
     @staticmethod
     def extract_video_id(url):
         match = re.search(r'(?:v=|youtu\.be/|embed/|v/|watch\?v=|&v=)([\w-]{11})', url)
@@ -241,13 +207,25 @@ class YouTubeTranscriptApp(QMainWindow):
         if not self.current_transcript:
             return
 
-        transcript_text = "\n".join(
-            [f"[{segment['start']:.2f}] {segment['text']}" for segment in self.current_transcript])
+        # Transkrypcja linia po linii
+        transcript_lines = [
+            f"[{segment['start']:.2f}] {segment['text']}"
+            for segment in self.current_transcript
+        ]
 
         if self.remove_timestamps_checkbox.isChecked():
-            transcript_text = re.sub(r'\[\d+\.\d{2}\]', '', transcript_text)
-            transcript_text = "\n".join([re.sub(r'\s+', ' ', line).strip() for line in transcript_text.splitlines()])
+            cleaned_lines = []
+            for line in transcript_lines:
+                # Usuń znacznik czasu z każdej linii
+                line_without_timestamp = re.sub(r'\[\d+\.\d{2}\]', '', line)
+                # Usuń dodatkowe spacje i dodaj do listy
+                cleaned_lines.append(re.sub(r'\s+', ' ', line_without_timestamp).strip())
 
+            transcript_text = "\n".join(cleaned_lines)
+        else:
+            transcript_text = "\n".join(transcript_lines)
+
+        # Wyświetl przetworzoną transkrypcję
         self.transcript_viewer.setText(transcript_text)
         self.status_bar.showMessage("Transkrypcja wyświetlona", 3000)
 
@@ -266,6 +244,7 @@ class YouTubeTranscriptApp(QMainWindow):
             self.status_bar.showMessage("Transkrypcja wyświetlona", 3000)
         except Exception as e:
             self.display_message(f"Nie udało się pobrać transkrypcji: {str(e)}", error=True)
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
