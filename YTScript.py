@@ -62,7 +62,7 @@ class YouTubeTranscriptApp(QMainWindow):
 
     def setup_input_ui(self):
         input_layout = QHBoxLayout()
-        input_layout.setContentsMargins(10, 10, 10, 10)
+        input_layout.setContentsMargins(0, 10, 0, 10)
         input_layout.setSpacing(10)
         self.url_input = QLineEdit()
         self.url_input.setPlaceholderText("Podaj link do filmu YouTube")
@@ -79,7 +79,7 @@ class YouTubeTranscriptApp(QMainWindow):
     def setup_queue_ui(self):
         self.video_queue_list = QListWidget()
         self.video_queue_list.setFixedHeight(150)
-        self.video_queue_list.setStyleSheet("font-family: 'Segoe UI'; font-size: 12pt; padding: 5px;")
+        self.video_queue_list.setStyleSheet("font-family: 'Segoe UI'; font-size: 10pt; padding: 5px;")
 
         self.video_queue_list.addItem("Brak filmów w kolejce")
         self.video_queue_list.itemClicked.connect(self.fetch_transcripts_from_queue)
@@ -88,7 +88,7 @@ class YouTubeTranscriptApp(QMainWindow):
     def setup_transcript_ui(self):
         self.transcripts_list = QComboBox()
         self.transcripts_list.setFixedHeight(50)
-        self.transcripts_list.setStyleSheet("font-family: 'Segoe UI'; font-size: 12pt; padding: 5px;")
+        self.transcripts_list.setStyleSheet("font-family: 'Segoe UI'; font-size: 10pt; padding: 5px;")
         self.transcripts_list.addItem("Brak dostępnych transkrypcji")
         self.transcripts_list.currentIndexChanged.connect(self.display_transcript)
         self.layout.addWidget(self.transcripts_list)
@@ -96,7 +96,7 @@ class YouTubeTranscriptApp(QMainWindow):
         self.transcript_viewer = QTextEdit()
         self.transcript_viewer.setFixedHeight(300)
         self.transcript_viewer.setPlaceholderText("Brak treści transkrypcji")
-        self.transcript_viewer.setStyleSheet("border: none; font-family: 'Segoe UI'; font-size: 12pt; padding: 5px; scrollbar: QScrollBar:vertical { width: 10px; background: #f0f0f0; border-radius: 5px; } QScrollBar::handle:vertical { background: #888; border-radius: 5px; }")
+        self.transcript_viewer.setStyleSheet("border: none; font-family: 'Segoe UI'; font-size: 10pt; padding: 5px; scrollbar: QScrollBar:vertical { width: 10px; background: #f0f0f0; border-radius: 5px; } QScrollBar::handle:vertical { background: #888; border-radius: 5px; }")
         self.layout.addWidget(self.transcript_viewer)
 
     def setup_clean_options_ui(self):
@@ -104,7 +104,7 @@ class YouTubeTranscriptApp(QMainWindow):
         clean_options_layout.setContentsMargins(10, 10, 10, 10)
         clean_options_layout.setSpacing(10)
         self.remove_timestamps_checkbox = QCheckBox("Usuń znaczniki czasu")
-        self.remove_timestamps_checkbox.setStyleSheet("font-family: 'Segoe UI'; font-size: 12pt; padding: 5px;")
+        self.remove_timestamps_checkbox.setStyleSheet("font-family: 'Segoe UI'; font-size: 10pt; padding: 5px;")
         self.remove_timestamps_checkbox.stateChanged.connect(self.update_transcript_viewer)
         clean_options_layout.addWidget(self.remove_timestamps_checkbox)
         self.layout.addLayout(clean_options_layout)
@@ -123,17 +123,15 @@ class YouTubeTranscriptApp(QMainWindow):
 
     def setup_status_bar(self):
         self.status_bar = QStatusBar()
-        self.status_bar.setStyleSheet("font-family: 'Segoe UI'; font-size: 12pt; padding: 5px;")
+        self.status_bar.setStyleSheet("font-family: 'Segoe UI'; font-size: 10pt; padding: 5px;")
         self.setStatusBar(self.status_bar)
 
     def setup_github_link(self):
         self.github_link = QLabel()
         github_url = "https://github.com/gitpyblog/YouTubeText"
-        self.github_link.setText(f"<a href='{github_url}'>GitHub Repository</a>")
-        self.github_link.setOpenExternalLinks(True)
+        self.github_link.setText(github_url)
         self.github_link.setAlignment(Qt.AlignmentFlag.AlignRight)
-        self.github_link.setFont(QFont('Segoe UI', 10))
-        self.github_link.setStyleSheet("color: red; text-decoration: none; padding: 5px;")
+        self.github_link.setStyleSheet("color: grey; padding: 5px;")
         self.status_bar.addPermanentWidget(self.github_link)
 
     def add_to_queue(self):
