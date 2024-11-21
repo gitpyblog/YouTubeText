@@ -8,9 +8,9 @@ from enum import Enum
 
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton,
-    QLineEdit, QListWidget, QTextEdit, QWidget, QMessageBox, QFileDialog, QCheckBox, QStatusBar, QComboBox
+    QLineEdit, QListWidget, QTextEdit, QWidget, QMessageBox, QFileDialog, QCheckBox, QStatusBar, QComboBox, QLabel
 )
-from PyQt6.QtGui import QIcon
+from PyQt6.QtGui import QIcon, QFont
 from PyQt6.QtCore import Qt
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api._errors import NoTranscriptFound, TranscriptsDisabled, VideoUnavailable
@@ -23,6 +23,12 @@ class TranscriptSegment:
 class FileType(Enum):
     JSON = "json"
     TXT = "txt"
+
+class StyledButton(QPushButton):
+    def __init__(self, text, parent=None):
+        super().__init__(text, parent)
+        self.setFixedSize(200, 50)
+        self.setStyleSheet("font-family: 'Segoe UI'; font-size: 12pt; padding: 5px;")
 
 class YouTubeTranscriptApp(QMainWindow):
     def __init__(self):
@@ -47,6 +53,7 @@ class YouTubeTranscriptApp(QMainWindow):
         self.setup_clean_options_ui()
         self.setup_save_buttons_ui()
         self.setup_status_bar()
+        self.setup_github_link()
 
     def initialize_data(self):
         self.current_transcript = None
@@ -60,11 +67,9 @@ class YouTubeTranscriptApp(QMainWindow):
         self.url_input = QLineEdit()
         self.url_input.setPlaceholderText("Podaj link do filmu YouTube")
         self.url_input.setFixedHeight(50)
-        self.url_input.setStyleSheet("font-family: 'Segoe UI'; font-size: 12pt; padding: 5px;")
+        self.url_input.setStyleSheet("font-family: 'Segoe UI'; font-size: 12pt; padding: 5px; border: none;")
 
-        self.fetch_button = QPushButton("Dodaj do kolejki")
-        self.fetch_button.setFixedSize(200, 50)
-        self.fetch_button.setStyleSheet("font-family: 'Segoe UI'; font-size: 12pt; padding: 5px;")
+        self.fetch_button = StyledButton("Dodaj do kolejki")
         self.fetch_button.clicked.connect(self.add_to_queue)
 
         input_layout.addWidget(self.url_input)
@@ -108,13 +113,9 @@ class YouTubeTranscriptApp(QMainWindow):
         save_buttons_layout = QHBoxLayout()
         save_buttons_layout.setContentsMargins(10, 10, 10, 10)
         save_buttons_layout.setSpacing(10)
-        self.save_json_button = QPushButton("Zapisz jako JSON")
-        self.save_json_button.setFixedSize(200, 50)
-        self.save_json_button.setStyleSheet("font-family: 'Segoe UI'; font-size: 12pt; padding: 5px;")
+        self.save_json_button = StyledButton("Zapisz jako JSON")
         self.save_json_button.clicked.connect(lambda: self.save_transcript(FileType.JSON))
-        self.save_txt_button = QPushButton("Zapisz jako TXT")
-        self.save_txt_button.setFixedSize(200, 50)
-        self.save_txt_button.setStyleSheet("font-family: 'Segoe UI'; font-size: 12pt; padding: 5px;")
+        self.save_txt_button = StyledButton("Zapisz jako TXT")
         self.save_txt_button.clicked.connect(lambda: self.save_transcript(FileType.TXT))
         save_buttons_layout.addWidget(self.save_json_button)
         save_buttons_layout.addWidget(self.save_txt_button)
@@ -124,6 +125,16 @@ class YouTubeTranscriptApp(QMainWindow):
         self.status_bar = QStatusBar()
         self.status_bar.setStyleSheet("font-family: 'Segoe UI'; font-size: 12pt; padding: 5px;")
         self.setStatusBar(self.status_bar)
+
+    def setup_github_link(self):
+        self.github_link = QLabel()
+        github_url = "https://github.com/gitpyblog/YouTubeText"
+        self.github_link.setText(f"<a href='{github_url}'>GitHub Repository</a>")
+        self.github_link.setOpenExternalLinks(True)
+        self.github_link.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.github_link.setFont(QFont('Segoe UI', 10))
+        self.github_link.setStyleSheet("color: red; text-decoration: none; padding: 5px;")
+        self.status_bar.addPermanentWidget(self.github_link)
 
     def add_to_queue(self):
         video_url = self.url_input.text().strip()
@@ -263,3 +274,5 @@ if __name__ == "__main__":
     window = YouTubeTranscriptApp()
     window.show()
     sys.exit(app.exec())
+
+# GitHub repository: https://github.com
