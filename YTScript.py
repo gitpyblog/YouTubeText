@@ -9,7 +9,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton,
-    QLineEdit, QListWidget, QTextEdit, QWidget, QMessageBox, QCheckBox, QStatusBar, QComboBox, QLabel
+    QLineEdit, QListWidget, QTextEdit, QWidget, QMessageBox, QCheckBox, QStatusBar, QComboBox, QLabel, QFileDialog
 )
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api._errors import NoTranscriptFound, TranscriptsDisabled, VideoUnavailable
@@ -249,12 +249,19 @@ class YouTubeTranscriptApp(QMainWindow):
             return
 
         try:
+            # Użycie QFileDialog do wyboru ścieżki zapisu
             if file_type == FileType.JSON:
-                file_path = "transcript.json"
+                file_path, _ = QFileDialog.getSaveFileName(self, "Zapisz jako JSON", re.sub(r'[\\\\/:*?"<>|]', '', self.video_titles.get(self.video_queue[-1], 'transcript')) + ".json", "Pliki JSON (*.json)")
+                if not file_path:
+                    return  # użytkownik anulował zapis
+
                 with open(file_path, "w", encoding="utf-8") as file:
                     json.dump(self.modified_transcript_text.split("\n"), file, indent=4, ensure_ascii=False)
             elif file_type == FileType.TXT:
-                file_path = "transcript.txt"
+                file_path, _ = QFileDialog.getSaveFileName(self, "Zapisz jako TXT", re.sub(r'[\\\\/:*?"<>|]', '', self.video_titles.get(self.video_queue[-1], 'transcript')) + ".txt", "Pliki tekstowe (*.txt)")
+                if not file_path:
+                    return  # użytkownik anulował zapis
+
                 with open(file_path, "w", encoding="utf-8") as file:
                     file.write(self.modified_transcript_text)
 
