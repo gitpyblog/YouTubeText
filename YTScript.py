@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton,
     QLineEdit, QListWidget, QTextEdit, QWidget, QMessageBox, QFileDialog, QCheckBox, QStatusBar, QComboBox
 )
+from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import Qt
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api._errors import NoTranscriptFound, TranscriptsDisabled, VideoUnavailable
@@ -31,11 +32,14 @@ class YouTubeTranscriptApp(QMainWindow):
 
     def initialize_ui(self):
         self.setWindowTitle("YouTube Transcript Viewer")
-        self.setGeometry(100, 100, 1200, 600)
+        self.setGeometry(100, 100, 900, 600)
+        self.setWindowIcon(QIcon('icon.ico'))  # Set the application icon
 
         self.main_widget = QWidget()
         self.setCentralWidget(self.main_widget)
         self.layout = QVBoxLayout(self.main_widget)
+        self.layout.setContentsMargins(10, 10, 10, 10)
+        self.layout.setSpacing(10)
 
         self.setup_input_ui()
         self.setup_queue_ui()
@@ -51,12 +55,16 @@ class YouTubeTranscriptApp(QMainWindow):
 
     def setup_input_ui(self):
         input_layout = QHBoxLayout()
+        input_layout.setContentsMargins(10, 10, 10, 10)
+        input_layout.setSpacing(10)
         self.url_input = QLineEdit()
         self.url_input.setPlaceholderText("Podaj link do filmu YouTube")
         self.url_input.setFixedHeight(50)
+        self.url_input.setStyleSheet("font-family: 'Segoe UI'; font-size: 12pt; padding: 5px;")
 
         self.fetch_button = QPushButton("Dodaj do kolejki")
         self.fetch_button.setFixedSize(200, 50)
+        self.fetch_button.setStyleSheet("font-family: 'Segoe UI'; font-size: 12pt; padding: 5px;")
         self.fetch_button.clicked.connect(self.add_to_queue)
 
         input_layout.addWidget(self.url_input)
@@ -66,6 +74,7 @@ class YouTubeTranscriptApp(QMainWindow):
     def setup_queue_ui(self):
         self.video_queue_list = QListWidget()
         self.video_queue_list.setFixedHeight(150)
+        self.video_queue_list.setStyleSheet("font-family: 'Segoe UI'; font-size: 12pt; padding: 5px;")
 
         self.video_queue_list.addItem("Brak filmów w kolejce")
         self.video_queue_list.itemClicked.connect(self.fetch_transcripts_from_queue)
@@ -74,6 +83,7 @@ class YouTubeTranscriptApp(QMainWindow):
     def setup_transcript_ui(self):
         self.transcripts_list = QComboBox()
         self.transcripts_list.setFixedHeight(50)
+        self.transcripts_list.setStyleSheet("font-family: 'Segoe UI'; font-size: 12pt; padding: 5px;")
         self.transcripts_list.addItem("Brak dostępnych transkrypcji")
         self.transcripts_list.currentIndexChanged.connect(self.display_transcript)
         self.layout.addWidget(self.transcripts_list)
@@ -81,22 +91,30 @@ class YouTubeTranscriptApp(QMainWindow):
         self.transcript_viewer = QTextEdit()
         self.transcript_viewer.setFixedHeight(300)
         self.transcript_viewer.setPlaceholderText("Brak treści transkrypcji")
+        self.transcript_viewer.setStyleSheet("border: none; font-family: 'Segoe UI'; font-size: 12pt; padding: 5px; scrollbar: QScrollBar:vertical { width: 10px; background: #f0f0f0; border-radius: 5px; } QScrollBar::handle:vertical { background: #888; border-radius: 5px; }")
         self.layout.addWidget(self.transcript_viewer)
 
     def setup_clean_options_ui(self):
         clean_options_layout = QHBoxLayout()
+        clean_options_layout.setContentsMargins(10, 10, 10, 10)
+        clean_options_layout.setSpacing(10)
         self.remove_timestamps_checkbox = QCheckBox("Usuń znaczniki czasu")
+        self.remove_timestamps_checkbox.setStyleSheet("font-family: 'Segoe UI'; font-size: 12pt; padding: 5px;")
         self.remove_timestamps_checkbox.stateChanged.connect(self.update_transcript_viewer)
         clean_options_layout.addWidget(self.remove_timestamps_checkbox)
         self.layout.addLayout(clean_options_layout)
 
     def setup_save_buttons_ui(self):
         save_buttons_layout = QHBoxLayout()
+        save_buttons_layout.setContentsMargins(10, 10, 10, 10)
+        save_buttons_layout.setSpacing(10)
         self.save_json_button = QPushButton("Zapisz jako JSON")
         self.save_json_button.setFixedSize(200, 50)
+        self.save_json_button.setStyleSheet("font-family: 'Segoe UI'; font-size: 12pt; padding: 5px;")
         self.save_json_button.clicked.connect(lambda: self.save_transcript(FileType.JSON))
         self.save_txt_button = QPushButton("Zapisz jako TXT")
         self.save_txt_button.setFixedSize(200, 50)
+        self.save_txt_button.setStyleSheet("font-family: 'Segoe UI'; font-size: 12pt; padding: 5px;")
         self.save_txt_button.clicked.connect(lambda: self.save_transcript(FileType.TXT))
         save_buttons_layout.addWidget(self.save_json_button)
         save_buttons_layout.addWidget(self.save_txt_button)
@@ -104,6 +122,7 @@ class YouTubeTranscriptApp(QMainWindow):
 
     def setup_status_bar(self):
         self.status_bar = QStatusBar()
+        self.status_bar.setStyleSheet("font-family: 'Segoe UI'; font-size: 12pt; padding: 5px;")
         self.setStatusBar(self.status_bar)
 
     def add_to_queue(self):
