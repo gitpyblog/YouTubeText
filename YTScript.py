@@ -69,11 +69,36 @@ def create_video_widget(title, url):
 class StyledButton(QPushButton):
     def __init__(self, text, parent=None):
         super().__init__(text, parent)
+        self.setFixedHeight(50)
         style = """
             QPushButton {
                 font-family: 'Segoe UI';
                 font-size: 12pt;
-                padding: 10px;
+                padding-left: 20px;
+                padding-right: 20px;
+                margin: 0px;
+                border: none;
+                border-radius: 0px;
+                background-color: #ffffff;
+                color: #000;
+                box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.2), -5px -5px 15px rgba(255, 255, 255, 0.8);
+            }
+            QPushButton:hover {
+                background-color: #f0f0f0;
+                box-shadow: 3px 3px 10px rgba(0, 0, 0, 0.15), -3px -3px 10px rgba(255, 255, 255, 0.7);
+            }
+            QPushButton:pressed {
+                background-color: #e0e0e0;
+                box-shadow: inset 5px 5px 15px rgba(0, 0, 0, 0.2), inset -5px -5px 15px rgba(255, 255, 255, 0.8);
+            }
+        """
+        self.setStyleSheet(style)
+        self.setFixedHeight(50)
+        style = """
+            QPushButton {
+                font-family: 'Segoe UI';
+                font-size: 12pt;
+                padding: 0px;
                 margin: 0px;
                 border: none;
                 border-radius: 0px;
@@ -133,9 +158,11 @@ class YouTubeTranscriptApp(QMainWindow):
         set_widget_style(self.url_input, font_size=12, padding=10)
 
         self.fetch_button = StyledButton("Dodaj do kolejki")
+        self.fetch_button.setFixedWidth(150)
         self.fetch_button.clicked.connect(self.add_to_queue)
 
         input_layout.addWidget(self.url_input)
+        input_layout.addSpacing(5)
         input_layout.addWidget(self.fetch_button)
         self.layout.addLayout(input_layout)
 
@@ -175,11 +202,45 @@ class YouTubeTranscriptApp(QMainWindow):
     def setup_transcript_ui(self):
         self.transcripts_list = QComboBox()
         self.transcripts_list.setFixedHeight(50)
+        self.transcripts_list.setStyleSheet('QComboBox QAbstractItemView::item { padding-left: 50px; }')
         style = """
             QComboBox {
                 font-family: 'Segoe UI';
                 font-size: 10pt;
-                padding: 10px;
+                padding-left: 10px;
+                margin: 3px 0;
+                border: none;
+                border-radius: 0px;
+                background-color: #ffffff;
+                color: #000;
+                box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.2), -5px -5px 15px rgba(255, 255, 255, 0.8);
+                font-family: 'Segoe UI';
+                font-size: 10pt;
+                padding: 0px;
+                margin: 3px 0;
+                border: none;
+                border-radius: 0px;
+                background-color: #ffffff;
+                color: #000;
+                box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.2), -5px -5px 15px rgba(255, 255, 255, 0.8);
+                qproperty-alignment: 'AlignLeft';
+            }
+                font-family: 'Segoe UI';
+                font-size: 10pt;
+                padding: 0px;
+                margin: 3px 0;
+                border: none;
+                border-radius: 0px;
+                background-color: #ffffff;
+                color: #000;
+                box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.2), -5px -5px 15px rgba(255, 255, 255, 0.8);
+                QAbstractItemView {
+                    padding-left: 50px;
+                }
+                padding-left: 50px;
+                font-family: 'Segoe UI';
+                font-size: 10pt;
+                padding: 0px;
                 margin: 3px 0;
                 border: none;
                 border-radius: 0px;
@@ -236,14 +297,15 @@ class YouTubeTranscriptApp(QMainWindow):
         self.layout.addWidget(self.transcript_viewer)
 
     def setup_clean_options_ui(self):
-        clean_options_layout = create_standard_layout()
+        clean_options_layout = QHBoxLayout()
+        clean_options_layout.setContentsMargins(0, 0, 0, 0)
         self.remove_timestamps_checkbox = QCheckBox("Usuń znaczniki czasu")
         style = """
             QCheckBox {
                 font-family: 'Segoe UI';
                 font-size: 10pt;
-                padding: 10px;
-                margin: 5px;
+                padding: 0px;
+                margin: 0px;
                 border: none;
                 border-radius: 0px;
                 color: #000;
