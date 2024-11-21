@@ -5,7 +5,6 @@ from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton,
     QLineEdit, QListWidget, QTextEdit, QWidget, QMessageBox, QFileDialog, QCheckBox, QStatusBar, QComboBox
 )
-from PyQt5.QtCore import Qt, QTimer
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api._errors import NoTranscriptFound, TranscriptsDisabled, VideoUnavailable
 import json
@@ -14,7 +13,7 @@ class YouTubeTranscriptApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("YouTube Transcript Viewer")
-        self.setGeometry(100, 100, 1300, 900)
+        self.setGeometry(100, 100, 1200, 600)
 
         # Load Modern Fonts
         self.setStyleSheet("font-family: 'Roboto', 'Open Sans'; font-size: 16px;")
@@ -49,7 +48,7 @@ class YouTubeTranscriptApp(QMainWindow):
         self.video_queue_list.addItem("Brak filmów w kolejce")
         self.video_queue_list.itemClicked.connect(self.fetch_transcripts_from_queue)
 
-        # Transcript List (Change QListWidget to QComboBox)
+        # Transcript List (QComboBox for selecting available transcripts)
         self.transcripts_list = QComboBox()
         self.transcripts_list.setStyleSheet(
             "border: 1px solid #ccc; background-color: #fafafa; padding: 10px; font-size: 16px; "
@@ -80,7 +79,7 @@ class YouTubeTranscriptApp(QMainWindow):
         )
         self.transcript_viewer.setFixedHeight(300)
         self.transcript_viewer.setPlaceholderText("Brak treści transkrypcji")
-        self.transcript_viewer.setReadOnly(False)  # Allow editing
+        self.transcript_viewer.setReadOnly(False)
 
         # Save Buttons
         self.save_buttons_layout = QHBoxLayout()
@@ -103,29 +102,18 @@ class YouTubeTranscriptApp(QMainWindow):
         self.layout.addWidget(self.video_queue_list)
         self.layout.addWidget(self.transcripts_list)
         self.layout.addLayout(self.clean_options_layout)
-        self.layout.addSpacing(5)
         self.layout.addWidget(self.transcript_viewer)
         self.layout.addLayout(self.save_buttons_layout)
 
         # Transcript Data
         self.current_transcript = None
         self.video_queue = []
-        self.video_titles = {}  # Store video titles to avoid fetching multiple times
+        self.video_titles = {}
 
     def add_to_queue(self):
         video_url = self.url_input.text().strip()
         video_id = self.extract_video_id(video_url)
         if not video_id:
-            QMessageBox.warning(self, "Błąd", "Nieprawidłowy link do filmu.")
-            self.status_bar.showMessage("Nieprawidłowy link do filmu.", 5000)
-            return
-
-        # Update status bar while fetching
-        self.status_bar.showMessage("Dodawanie filmu do kolejki...")
-        QTimer.singleShot(2000, lambda: self.status_bar.showMessage("Film dodany do kolejki", 5000))  # Simulate delay for testing
-
-        # Sprawdzenie czy URL jest poprawny przed pobieraniem tytułu
-        if not video_url.startswith("http"):
             QMessageBox.warning(self, "Błąd", "Nieprawidłowy link do filmu.")
             self.status_bar.showMessage("Nieprawidłowy link do filmu.", 5000)
             return
@@ -145,22 +133,20 @@ class YouTubeTranscriptApp(QMainWindow):
         self.video_queue.append(video_id)
         self.video_queue_list.addItem(f"{video_title} ({video_url})")
         self.url_input.clear()
+        self.status_bar.showMessage("Film dodany do kolejki", 5000)
 
     def fetch_transcripts_from_queue(self, item):
-        # Clear previous transcripts
+        # Clear previous transcript and transcript list
+        self.transcript_viewer.clear()
         self.transcripts_list.clear()
 
-        # Update status bar while fetching
-        self.status_bar.showMessage("Pobieranie transkrypcji...")
-        QTimer.singleShot(2000, lambda: self.status_bar.showMessage("Transkrypcje pobrane", 5000))  # Simulate delay for testing
-
-        # Check if the placeholder item is selected
         if item.text() == "Brak filmów w kolejce":
             return
 
         video_index = self.video_queue_list.row(item)
         video_id = self.video_queue[video_index]
         try:
+            self.status_bar.showMessage("Pobieranie transkrypcji...", 2000)
             transcripts = YouTubeTranscriptApi.list_transcripts(video_id)
             if transcripts:
                 for transcript in transcripts:
@@ -169,21 +155,13 @@ class YouTubeTranscriptApp(QMainWindow):
                     self.transcripts_list.addItem(f"{lang} ({lang_code})", userData=transcript)
             else:
                 self.transcripts_list.addItem("Brak dostępnych transkrypcji")
-        except VideoUnavailable:
-            QMessageBox.warning(self, "Błąd", "Nie znaleziono filmu lub film jest niedostępny.")
-            self.status_bar.showMessage("Nie znaleziono filmu lub film jest niedostępny.", 5000)
-        except NoTranscriptFound:
+            self.status_bar.showMessage("Transkrypcje pobrane", 5000)
+        except (VideoUnavailable, NoTranscriptFound, TranscriptsDisabled):
             QMessageBox.warning(self, "Błąd", "Brak dostępnych transkrypcji dla tego filmu.")
             self.status_bar.showMessage("Brak dostępnych transkrypcji dla tego filmu.", 5000)
-            self.transcripts_list.addItem("Brak dostępnych transkrypcji")
-        except TranscriptsDisabled:
-            QMessageBox.warning(self, "Błąd", "Transkrypcje są wyłączone dla tego filmu.")
-            self.status_bar.showMessage("Transkrypcje są wyłączone dla tego filmu.", 5000)
-            self.transcripts_list.addItem("Brak dostępnych transkrypcji")
         except Exception as e:
             QMessageBox.critical(self, "Błąd", f"Nieoczekiwany błąd: {str(e)}")
             self.status_bar.showMessage(f"Nieoczekiwany błąd: {str(e)}", 5000)
-            self.transcripts_list.addItem("Brak dostępnych transkrypcji")
 
     def display_transcript(self):
         if self.transcripts_list.currentText() == "Brak dostępnych transkrypcji":
@@ -196,7 +174,7 @@ class YouTubeTranscriptApp(QMainWindow):
         try:
             segments = transcript.fetch()
             self.current_transcript = segments
-            self.update_transcript_viewer()  # Now update the viewer with current transcript
+            self.update_transcript_viewer()
             self.status_bar.showMessage("Transkrypcja wyświetlona", 5000)
         except Exception as e:
             QMessageBox.critical(self, "Błąd", f"Nie udało się pobrać transkrypcji: {str(e)}")
@@ -219,6 +197,7 @@ class YouTubeTranscriptApp(QMainWindow):
             transcript_text = "\n".join([re.sub(r'\s+', ' ', line).strip() for line in transcript_text.splitlines()])
 
         self.transcript_viewer.setText(transcript_text)
+        self.status_bar.showMessage("Transkrypcja wyświetlona", 5000)
 
     def save_transcript(self, file_type):
         if not self.current_transcript:
@@ -242,12 +221,10 @@ class YouTubeTranscriptApp(QMainWindow):
 
         try:
             if file_type == "json":
-                # Save as JSON
                 transcript_data = [{"start": segment["start"], "text": segment["text"]} for segment in self.current_transcript]
                 with open(file_path, "w", encoding="utf-8") as file:
                     json.dump(transcript_data, file, ensure_ascii=False, indent=4)
             elif file_type == "txt":
-                # Save as TXT
                 with open(file_path, "w", encoding="utf-8") as file:
                     file.write(transcript_text)
             QMessageBox.information(self, "Sukces", f"Plik został zapisany jako {file_path}")
