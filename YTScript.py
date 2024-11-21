@@ -5,11 +5,12 @@ from dataclasses import dataclass
 from enum import StrEnum
 import requests
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QIcon
+from PyQt6.QtGui import QIcon, QDesktopServices
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton,
     QLineEdit, QListWidget, QTextEdit, QWidget, QMessageBox, QCheckBox, QStatusBar, QComboBox, QLabel, QFileDialog
 )
+from PyQt6.QtCore import QUrl
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api._errors import NoTranscriptFound, TranscriptsDisabled, VideoUnavailable
 
@@ -129,9 +130,10 @@ class YouTubeTranscriptApp(QMainWindow):
     def setup_github_link(self):
         self.github_link = QLabel()
         github_url = "https://github.com/gitpyblog/YouTubeText"
-        self.github_link.setText(github_url)
+        self.github_link.setText(f'<a href="{github_url}" style="text-decoration: none; color: grey;">Repozytorium GitHub</a>')
+        self.github_link.setOpenExternalLinks(True)
         self.github_link.setAlignment(Qt.AlignmentFlag.AlignRight)
-        self.github_link.setStyleSheet("color: grey; padding: 5px;")
+        self.github_link.setStyleSheet("padding: 5px;")
         self.status_bar.addPermanentWidget(self.github_link)
 
     def add_to_queue(self):
