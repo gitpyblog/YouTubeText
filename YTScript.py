@@ -1,9 +1,7 @@
 import sys
 import re
 import requests
-import logging
 from pathlib import Path
-import logging
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton,
     QLineEdit, QListWidget, QTextEdit, QWidget, QMessageBox, QFileDialog, QCheckBox, QStatusBar, QComboBox
@@ -204,9 +202,8 @@ class YouTubeTranscriptApp(QMainWindow):
             if response.status_code == 200:
                 title_match = re.search(r'<title>(.*?)</title>', response.text, re.IGNORECASE)
                 return title_match.group(1).replace(" - YouTube", "").strip() if title_match else None
-        except requests.RequestException as e:
-            logging.error(f"Błąd podczas pobierania tytułu: {e}")
-        return None
+        except requests.RequestException:
+            return None
 
     def update_transcript_viewer(self):
         if not self.current_transcript:
