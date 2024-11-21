@@ -69,13 +69,12 @@ def create_video_widget(title, url):
 class StyledButton(QPushButton):
     def __init__(self, text, parent=None):
         super().__init__(text, parent)
-        self.setFixedSize(200, 60)
         style = """
             QPushButton {
                 font-family: 'Segoe UI';
                 font-size: 12pt;
                 padding: 10px;
-                margin: 5px;
+                margin: 0px;
                 border: none;
                 border-radius: 0px;
                 background-color: #ffffff;
@@ -266,13 +265,18 @@ class YouTubeTranscriptApp(QMainWindow):
         self.layout.addLayout(clean_options_layout)
 
     def setup_save_buttons_ui(self):
-        save_buttons_layout = create_standard_layout()
+        save_buttons_layout = QHBoxLayout()  # Użyj QHBoxLayout dla rozciągnięcia przycisków
+        save_buttons_layout.setContentsMargins(0, 0, 0, 0)
+        save_buttons_layout.setSpacing(5)  # Dodaj odstęp między przyciskami
+
         self.save_json_button = StyledButton("Zapisz jako JSON")
         self.save_txt_button = StyledButton("Zapisz jako TXT")
-        self.save_json_button.clicked.connect(lambda: self.save_transcript(FileType.JSON))
-        self.save_txt_button.clicked.connect(lambda: self.save_transcript(FileType.TXT))
+
+        # Dodaj przyciski do layoutu i ustaw rozciąganie, aby wypełnić szerokość
         save_buttons_layout.addWidget(self.save_json_button)
+        save_buttons_layout.addSpacing(5)  # Ustaw odstęp między przyciskami
         save_buttons_layout.addWidget(self.save_txt_button)
+
         self.layout.addLayout(save_buttons_layout)
 
     def setup_status_bar(self):
