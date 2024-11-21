@@ -138,7 +138,7 @@ class YouTubeTranscriptApp(QMainWindow):
         video_url = self.url_input.text().strip()
         video_id = self.extract_video_id(video_url)
         if not video_id:
-            self.display_message("Nieprawidłowy link do filmu.", error=True)
+            self.display_message("Nieprawidłowy link do filmu. Podaj link do filmu YouTube.", error=True)
             return
 
         video_title = self.video_titles.get(video_id) or self.get_video_title(video_url) or "Nieznany tytuł"
@@ -249,7 +249,7 @@ class YouTubeTranscriptApp(QMainWindow):
             transcript_text = "\n".join([re.sub(r'\s+', ' ', line).strip() for line in transcript_text.splitlines()])
 
         self.transcript_viewer.setText(transcript_text)
-        self.status_bar.showMessage("Transkrypcja wyświetlona", 5000)
+        self.status_bar.showMessage("Transkrypcja wyświetlona", 3000)
 
     def display_transcript(self):
         if self.transcripts_list.currentText() == "Brak dostępnych transkrypcji":
@@ -263,7 +263,7 @@ class YouTubeTranscriptApp(QMainWindow):
             segments = transcript.fetch()
             self.current_transcript = segments
             self.update_transcript_viewer()
-            self.status_bar.showMessage("Transkrypcja wyświetlona", 5000)
+            self.status_bar.showMessage("Transkrypcja wyświetlona", 3000)
         except Exception as e:
             self.display_message(f"Nie udało się pobrać transkrypcji: {str(e)}", error=True)
 
