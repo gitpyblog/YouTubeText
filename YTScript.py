@@ -1,6 +1,9 @@
 import sys
 import re
 import requests
+import logging
+from pathlib import Path
+import logging
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton,
     QLineEdit, QListWidget, QTextEdit, QWidget, QMessageBox, QFileDialog, QCheckBox, QStatusBar, QComboBox
@@ -32,7 +35,6 @@ class YouTubeTranscriptApp(QMainWindow):
     def initialize_ui(self):
         self.setWindowTitle("YouTube Transcript Viewer")
         self.setGeometry(100, 100, 1200, 600)
-        self.setStyleSheet("font-family: 'Roboto', 'Open Sans'; font-size: 16px;")
 
         self.main_widget = QWidget()
         self.setCentralWidget(self.main_widget)
@@ -54,7 +56,6 @@ class YouTubeTranscriptApp(QMainWindow):
         input_layout = QHBoxLayout()
         self.url_input = QLineEdit(placeholderText="Podaj link do filmu YouTube")
         self.url_input.setFixedHeight(50)
-        self.url_input.setStyleSheet("padding: 10px; border: 1px solid #ccc; border-radius: 5px;")
 
         self.fetch_button = QPushButton("Dodaj do kolejki", clicked=self.add_to_queue)
         self.fetch_button.setFixedSize(200, 50)
@@ -66,9 +67,7 @@ class YouTubeTranscriptApp(QMainWindow):
     def setup_queue_ui(self):
         self.video_queue_list = QListWidget()
         self.video_queue_list.setFixedHeight(150)
-        self.video_queue_list.setStyleSheet(
-            "border: 1px solid #ccc; background-color: #fafafa; padding: 10px; font-size: 16px; "
-        )
+
         self.video_queue_list.addItem("Brak filmów w kolejce")
         self.video_queue_list.itemClicked.connect(self.fetch_transcripts_from_queue)
         self.layout.addWidget(self.video_queue_list)
@@ -134,7 +133,8 @@ class YouTubeTranscriptApp(QMainWindow):
             transcripts = YouTubeTranscriptApi.list_transcripts(video_id)
             self.populate_transcripts_list(transcripts)
             self.status_bar.showMessage("Transkrypcje pobrane", 5000)
-        except (VideoUnavailable, NoTranscriptFound, TranscriptsDisabled):
+        except (VideoUnavailable, NoTranscriptFound, TranscriptsDisabled) as e:
+            self.display_message(f"Błąd: {str(e)}", error=True)
             self.display_message("Brak dostępnych transkrypcji dla tego filmu.", error=True)
         except Exception as e:
             self.display_message(f"Nieoczekiwany błąd: {str(e)}", error=True)
@@ -150,8 +150,8 @@ class YouTubeTranscriptApp(QMainWindow):
 
     def display_message(self, message, error=False):
         if error:
-            QMessageBox.warning(self, "Błąd", message)
-        self.status_bar.showMessage(message, 5000)
+            QMessageBox.critical(self, "Błąd", message)
+        self.status_bar.showMessage(message, 7000)
 
     def save_transcript(self, file_type: FileType):
         if not self.current_transcript:
@@ -165,7 +165,9 @@ class YouTubeTranscriptApp(QMainWindow):
         current_video_id = self.video_queue[self.video_queue_list.currentRow()]
         default_file_name = self.video_titles.get(current_video_id, "transkrypcja")
 
-        file_path, _ = QFileDialog.getSaveFileName(self, "Zapisz plik", default_file_name, file_filter, options=options)
+        file_path, _ = QFileDialog.getSaveFileName(self, "Zapisz plik", f"{default_file_name}", file_filter,
+                                                   options=options)
+        file_path = Path(file_path)
         if not file_path:
             return
 
@@ -173,7 +175,7 @@ class YouTubeTranscriptApp(QMainWindow):
             if file_type == FileType.JSON:
                 transcript_data = [TranscriptSegment(segment['start'], segment['text']).__dict__ for segment in
                                    self.current_transcript]
-                with open(file_path, "w", encoding="utf-8") as file:
+                with file_path.open("w", encoding="utf-8") as file:
                     json.dump(transcript_data, file, ensure_ascii=False, indent=4)
             elif file_type == FileType.TXT:
                 with open(file_path, "w", encoding="utf-8") as file:
@@ -184,7 +186,7 @@ class YouTubeTranscriptApp(QMainWindow):
 
     @staticmethod
     def extract_video_id(url):
-        match = re.search(r'(?:v=|youtu\.be/)([\w-]+)', url)
+        match = re.search(r'(?:v=|youtu\.be/|embed/|v/|watch\?v=|&v=)([\w-]{11})', url)
         return match.group(1) if match else None
 
     def get_video_title(self, url):
@@ -194,7 +196,7 @@ class YouTubeTranscriptApp(QMainWindow):
                 title_match = re.search(r'<title>(.*?)</title>', response.text, re.IGNORECASE)
                 return title_match.group(1).replace(" - YouTube", "").strip() if title_match else None
         except requests.RequestException as e:
-            print(f"Błąd podczas pobierania tytułu: {e}")
+            logging.error(f"Błąd podczas pobierania tytułu: {e}")
         return None
 
     def update_transcript_viewer(self):
@@ -243,4 +245,4 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = YouTubeTranscriptApp()
     window.show()
-    sys.exit(app.exec_())
+    sys.exit(app.exec())
